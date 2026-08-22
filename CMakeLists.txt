@@ -20,12 +20,16 @@ qt_add_executable(appYomiReader
 qt_add_qml_module(appYomiReader
     URI YomiReader
     QML_FILES
-        Main.qml
+        UI/UI_QML_files/Appwindow.qml
+        UI/UI_QML_files/Homescreen.qml
     RESOURCES
     UI/assets/images/Bookmarks.png
-    UI/assets/images/files.png
-    UI/assets/images/Last Read.png
+    UI/assets/images/Files.png
+    UI/assets/images/LastRead.png
     UI/assets/images/Reading.png
+    UI/assets/images/Homescreen.png
+    UI/assets/images/AppIcon.png
+    UI/assets/images/ThreeDots.png
 )
 
 # Qt for iOS sets MACOSX_BUNDLE_GUI_IDENTIFIER automatically since Qt 6.1.

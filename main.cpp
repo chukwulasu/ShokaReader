@@ -1,10 +1,11 @@
 #include <QGuiApplication>
 #include <QQmlApplicationEngine>
+#include <QIcon>
 
-int main(int argc, char *argv[])
+int main(int argc, char* argv[])
 {
     QGuiApplication app(argc, argv);
-
+    app.setWindowIcon(QIcon(":/qt/qml/YomiReader/UI/assets/images/AppIcon.png"));
     QQmlApplicationEngine engine;
     QObject::connect(
         &engine,
@@ -12,7 +13,7 @@ int main(int argc, char *argv[])
         &app,
         []() { QCoreApplication::exit(-1); },
         Qt::QueuedConnection);
-    engine.loadFromModule("YomiReader", "Main");
+    engine.loadFromModule("YomiReader", "Appwindow");
 
     return QGuiApplication::exec();
 }
