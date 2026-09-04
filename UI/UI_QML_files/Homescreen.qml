@@ -2,7 +2,7 @@ import QtQuick
 import QtQuick.Layouts
 
 Rectangle {
-    id: homeRoot
+    id: homeScreen
     color: "#16261B"
 
     Item {
