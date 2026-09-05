@@ -12,12 +12,11 @@ ApplicationWindow {
     visibility: Window.Maximized
     title: "ShokaReader"
 
-    // Master layout wrapping the persistent activity bar and the dynamic stack view
     RowLayout {
         anchors.fill: parent
         spacing: 0
 
-        // 1. Persistent Global Activity Bar
+        //Global Activity Bar
         Rectangle {
             id: activityBar
             Layout.preferredWidth: 50
@@ -68,7 +67,7 @@ ApplicationWindow {
             }
         }
 
-        // 2. Central Dynamic Workspace (Managed by StackView)
+        //Central Dynamic Workspace (Managed by StackView)
         Item {
             Layout.fillWidth: true
             Layout.fillHeight: true
@@ -95,13 +94,13 @@ ApplicationWindow {
         target: documentManager
 
         function onFileUrlChanged() {
-            if (documentManager.fileUrl.toString() === "") return;
+            if (documentManager.getFileUrl.toString() === "") return;
 
-            console.log("[QML] Backend confirmed load success for: " + documentManager.fileUrl);
+            console.log("[QML] Backend confirmed load success for: " + documentManager.getFileUrl);
 
             stackView.clear();
             stackView.push("Readerscreen.qml", {
-                documentSource: documentManager.fileUrl
+                documentSource: documentManager.getFileUrl
             });
         }
 

@@ -36,7 +36,7 @@ void DocumentManager::openDocument(const QUrl filePath){
     }
 
     if (fileType == DocumentType::Unsupported) {
-        emit errorOccurred("This ebook format is not supported yet.");
+        emit errorOccurred("This file format is not supported.");
         return;
     }
 
@@ -60,7 +60,7 @@ void DocumentManager::openDocument(const QUrl filePath){
     }
 }
 
-QUrl DocumentManager::fileUrl() const {
+QUrl DocumentManager::getFileUrl() const {
     return m_fileUrl;
 }
 
