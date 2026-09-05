@@ -29,6 +29,7 @@ qt_add_qml_module(appShokaReader
         UI/UI_QML_files/Appwindow.qml
         UI/UI_QML_files/Homescreen.qml
         UI/UI_QML_files/Readerscreen.qml
+        UI/UI_QML_files/Custom_Items/C_ToolbarButton.qml
     RESOURCES
     UI/assets/images/Bookmarks.png
     UI/assets/images/Files.png

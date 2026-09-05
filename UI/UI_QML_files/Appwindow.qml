@@ -3,6 +3,7 @@ import QtQuick.Window
 import QtQuick.Controls
 import QtQuick.Dialogs
 import QtQuick.Layouts
+import "Custom_Items"
 
 ApplicationWindow {
     id: root
@@ -27,42 +28,32 @@ ApplicationWindow {
                 anchors.fill: parent
                 spacing: 0
 
-                Item {
-                    Layout.preferredWidth: 50; Layout.preferredHeight: 50
-                    Image { anchors.centerIn: parent; width: 24; height: 24; source: "../assets/images/LastRead.png"; fillMode: Image.PreserveAspectFit }
-                }
-                Item {
-                    Layout.preferredWidth: 50; Layout.preferredHeight: 50
-                    Image { anchors.centerIn: parent; width: 24; height: 24; source: "../assets/images/Files.png"; fillMode: Image.PreserveAspectFit }
-                    MouseArea {
-                        anchors.fill: parent
-                        onClicked: fileOpenDialog.open()
-                    }
-                 Action {
-                        shortcut: "Ctrl+O"
-                        onTriggered: fileOpenDialog.open()
-                    }
-                }
-                Item {
-                    Layout.preferredWidth: 50; Layout.preferredHeight: 50
-                    Image { anchors.centerIn: parent; width: 24; height: 24; source: "../assets/images/Reading.png"; fillMode: Image.PreserveAspectFit }
-                }
-                Item {
-                    Layout.preferredWidth: 50; Layout.preferredHeight: 50
-                    Image { anchors.centerIn: parent; width: 24; height: 24; source: "../assets/images/Bookmarks.png"; fillMode: Image.PreserveAspectFit }
+                C_ToolbarButton{
+                    id:lastReadButton
+                    source: "../../assets/images/LastRead.png"
                 }
 
-                // Pushes the bottom icon to the very end of the bar
-                Item { Layout.fillHeight: true }
+                C_ToolbarButton{
+                    id:filesButton
+                    source: "../../assets/images/Files.png"
+                    shortcut: "Ctrl+O"
+                    onClicked: fileOpenDialog.open()
+                    toolTipText: "Open File (Ctrl+O)"
+                }
 
-                // 3-Dots Menu Icon Placeholder (Ready for menu implementation later)
-                Item {
-                    Layout.preferredWidth: 50; Layout.preferredHeight: 50
-                    Image {
-                        anchors.centerIn: parent; width: 24; height: 24;
-                        source: "../assets/images/ThreeDots.png"
-                        fillMode: Image.PreserveAspectFit
-                    }
+                C_ToolbarButton{
+                    id:readingButton
+                    source: "../../assets/images/Reading.png"
+                }
+
+                C_ToolbarButton{
+                    id:bookMarkButton
+                    source: "../../assets/images/Bookmarks.png"
+                }
+
+                // Spacer item to push all buttons to the top and absorb remaining space
+                Item{
+                    Layout.fillHeight: true
                 }
             }
         }
