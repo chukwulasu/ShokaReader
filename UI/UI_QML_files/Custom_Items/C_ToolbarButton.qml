@@ -29,7 +29,7 @@ Item {
         onClicked: root.clicked()
         ToolTip.visible: mouseArea.containsMouse && root.toolTipText !== ""
         ToolTip.text: root.toolTipText
-        ToolTip.delay: 500
+        ToolTip.delay: 300
     }
 
     Shortcut {
