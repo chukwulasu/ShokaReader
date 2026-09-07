@@ -2,36 +2,31 @@
 #include "Libraries/DocumentManager/PdfDocument.h"
 
 DocumentManager::DocumentManager(QObject* parent)
-    : QObject(parent)
-{
+    : QObject(parent) {
+
 }
 
-DocumentType DocumentManager::GetFileType(const QUrl& qmlFilePath) const{
+DocumentType DocumentManager::GetFileType(const QUrl& qmlFilePath) const {
+    QFileInfo qtFilePath(qmlFilePath.toLocalFile());
 
-    QFileInfo qtFilePath (qmlFilePath.toLocalFile());
-
-    if(!qtFilePath.isFile()){
+    if (!qtFilePath.isFile()) {
         return DocumentType::Invalid;
     }
     QString fileExtension = qtFilePath.suffix().toLower();
 
-    if(fileExtension == "pdf"){
+    if (fileExtension == "pdf") {
         return DocumentType::PDF;
-    }
-
-    else if(fileExtension == "epub"){
+    } else if (fileExtension == "epub") {
         return DocumentType::EPUB;
-    }
-
-    else{
+    } else {
         return DocumentType::Unsupported;
     }
 }
 
-void DocumentManager::openDocument(const QUrl filePath){
+void DocumentManager::openDocument(const QUrl& filePath) {
     DocumentType fileType = GetFileType(filePath);
     if (fileType == DocumentType::Invalid) {
-        emit errorOccurred("The selected file is missing or Unsupported.");
+        emit errorOccurred("The selected file is missing or unsupported.");
         return;
     }
 
@@ -41,7 +36,6 @@ void DocumentManager::openDocument(const QUrl filePath){
     }
 
     if (fileType == DocumentType::PDF) {
-        // Automatically deletes previous engine from memory and creates a PdfDocument child object
         m_activeEngine = std::make_unique<PdfDocument>();
     }
 
@@ -49,19 +43,16 @@ void DocumentManager::openDocument(const QUrl filePath){
         m_activeEngine = std::make_unique<EpubDocument>();
     } */
 
-    if (m_activeEngine != nullptr) {
-        m_activeEngine->loadDocument(filePath);
+    m_activeEngine->getDocumentMetaData(filePath);
 
-        // Update states and trigger UI bindings
-        m_fileUrl = filePath;
-        m_currentType = fileType;
-        emit fileUrlChanged();
-        emit typeChanged();
-    }
+    m_currentType = fileType;
+    emit activeDocumentChanged();
+    emit typeChanged();
+
 }
 
-QUrl DocumentManager::getFileUrl() const {
-    return m_fileUrl;
+DocumentBase* DocumentManager::activeDocument() const {
+    return m_activeEngine.get();
 }
 
 DocumentType DocumentManager::currentType() const {

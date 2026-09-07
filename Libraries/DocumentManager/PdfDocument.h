@@ -1,21 +1,19 @@
 #pragma once
 
-#include <QObject>
+#include <QPdfDocument>
 #include "Libraries/DocumentManager/DocumentBase.h"
 
-class PdfDocument :  public QObject, public DocumentBase{
+class PdfDocument : public DocumentBase {
     Q_OBJECT
-    Q_PROPERTY(QUrl source READ getSource NOTIFY sourceChanged)
 
 public:
     explicit PdfDocument(QObject* parent = nullptr);
-    ~PdfDocument() override = default;
-    Q_INVOKABLE void loadDocument(const QUrl& filePath) override;
-    QUrl getSource() const;
+    ~PdfDocument() override;
 
-signals:
-    void sourceChanged();
+    void getDocumentMetaData(const QUrl& filePath) override;
+    QImage renderPageImage(int pageIndex, const QSize& targetSize) override;
+    QSizeF nativePageSize(int pageIndex) const override;
 
 private:
-    QUrl m_sourceUrl;
+    QPdfDocument m_pdfDocument;
 };

@@ -5,18 +5,26 @@
 #include <QIcon>
 
 #include "Libraries/DocumentManager/DocumentManager.h"
+#include "Libraries/DocumentManager/DocumentImageProvider.h"
 
 int main(int argc, char* argv[])
 {
     QGuiApplication app(argc, argv);
     app.setWindowIcon(QIcon(":/qt/qml/ShokaReader/UI/assets/images/AppIcon.png"));
+
     DocumentManager globalDocManager;
     QQmlApplicationEngine engine;
+
+    // Register the document manager context property
     engine.rootContext()->setContextProperty("documentManager", &globalDocManager);
+
+    // Register the custom image provider to bridge C++ QImage rendering to QML Image elements
+    engine.addImageProvider(QStringLiteral("documentProvider"), new DocumentImageProvider(&globalDocManager));
+
     const QUrl applicationQmlUrl(QStringLiteral("qrc:/qt/qml/ShokaReader/UI/UI_QML_files/Appwindow.qml"));
     QObject::connect(&engine, &QQmlApplicationEngine::objectCreationFailed,
-                    &app, []() { QCoreApplication::exit(-1); },
-                    Qt::QueuedConnection);
+                     &app, []() { QCoreApplication::exit(-1); },
+                     Qt::QueuedConnection);
 
     engine.load(applicationQmlUrl);
     return app.exec();

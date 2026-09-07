@@ -1,85 +1,93 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
-import QtQuick.Pdf
 
 Rectangle {
     id: readerScreen
     objectName: "readerView"
-    color: "#1E1E1E"
+    color: "#121212"
 
-    property url documentSource: ""
+    property int currentPage: 0
+    property int totalPages: documentManager.activeDocument ? documentManager.activeDocument.totalPageNumber : 0
 
-    PdfDocument {
-        id: pdfDoc
-        source: documentSource
+    function goToNextPage() {
+        if (listView.currentIndex < totalPages - 1) {
+            listView.currentIndex++;
+            listView.positionViewAtIndex(listView.currentIndex, ListView.Beginning);
+        }
     }
 
-    // High-precision trackpad & mousewheel scrolling interceptor
-    MouseArea {
+    function goToPreviousPage() {
+        if (listView.currentIndex > 0) {
+            listView.currentIndex--;
+            listView.positionViewAtIndex(listView.currentIndex, ListView.Beginning);
+        }
+    }
+
+    focus: true
+    Keys.onPressed: (event) => {
+        if (event.key === Qt.Key_Down || event.key === Qt.Key_PageDown) {
+            goToNextPage();
+            event.accepted = true;
+        } else if (event.key === Qt.Key_Up || event.key === Qt.Key_PageUp) {
+            goToPreviousPage();
+            event.accepted = true;
+        }
+    }
+
+    ListView {
+        id: listView
         anchors.fill: parent
-        propagateComposedEvents: true
+        clip: true
+        spacing: 24
+        model: totalPages
 
-        onWheel: (wheel) => {
-            if (wheel.angleDelta.y !== 0) {
-                let sensitivityFactor = 360;
-                let scrollAmount = wheel.angleDelta.y / sensitivityFactor;
-
-                if (scrollAmount > 0) {
-                    view.goToPreviousPage();
-                } else {
-                    view.goToNextPage();
-                }
-                wheel.accepted = true;
+        onContentYChanged: {
+            let idx = listView.indexAt(contentX, contentY + 20);
+            if (idx >= 0) {
+                currentPage = idx;
             }
         }
 
-        PdfMultiPageView {
-            id: view
-            anchors.fill: parent
-            document: pdfDoc
-            renderScale: 1.2
+        // Explicitly add a visible vertical scrollbar
+        ScrollBar.vertical: ScrollBar {
+            id: vbar
+            active: true
+            policy: ScrollBar.AlwaysOn
+        }
 
-            // 🌟 THE ONE-PAGE RESOLUTION FIX:
-            Component.onCompleted: {
-                let vBar = view.ScrollView.vertical;
-                if (vBar) {
-                    // 1. Disable the native incremental behavior
-                    vBar.active = true;
+        delegate: Item {
+            width: listView.width
+            // Account for card padding margins in total delegate height
+            height: (documentManager.activeDocument ? documentManager.activeDocument.nativePageSize(index).height * scaleFactor : 1131) + 40
 
-                    // 2. Safely query the child buttons of the native ScrollBar.
-                    // Built-in scrollbars render an up-arrow (decrease visual button)
-                    // and a down-arrow (increase visual button) at their boundaries.
-                    for (let i = 0; i < vBar.children.length; ++i) {
-                        let child = vBar.children[i];
+            property real scaleFactor: 1.2
 
-                        // Detect and intercept the Up Arrow Button
-                        if (child.objectName === "decreaseVisual" || (child.text !== undefined && child.text === "▲")) {
-                            child.onPressed.connect(function() {
-                                view.goToPreviousPage(); // 🌟 Force EXACTLY 1 page up!
-                            });
-                        }
+            // White paper card container to fix transparent PDF blending and text overlap
+            Rectangle {
+                anchors.horizontalCenter: parent.horizontalCenter
+                anchors.top: parent.top
+                anchors.topMargin: 20
 
-                        // Detect and intercept the Down Arrow Button
-                        if (child.objectName === "increaseVisual" || (child.text !== undefined && child.text === "▼")) {
-                            child.onPressed.connect(function() {
-                                view.goToNextPage(); // 🌟 Force EXACTLY 1 page down!
-                            });
-                        }
-                    }
+                width: documentManager.activeDocument ? documentManager.activeDocument.nativePageSize(index).width * scaleFactor : 800
+                height: documentManager.activeDocument ? documentManager.activeDocument.nativePageSize(index).height * scaleFactor : 1131
+
+                color: "#FFFFFF"
+                border.color: "#333333"
+                border.width: 1
+
+                Image {
+                    id: pageImage
+                    anchors.fill: parent
+                    anchors.margins: 1
+
+                    source: "image://documentProvider/page_" + index
+
+                    fillMode: Image.PreserveAspectFit
+                    asynchronous: true
+                    cache: true
                 }
             }
-
-            Label {
-                text: "Parsing digital layout..."
-                color: "white"
-                visible: pdfDoc.status === PdfDocument.Loading
-                anchors.centerIn: parent
-            }
         }
-    }
-
-    onDocumentSourceChanged: {
-        console.log("[QML Panel] Rendering engine targeting location: " + documentSource);
     }
 }

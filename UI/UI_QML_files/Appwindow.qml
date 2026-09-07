@@ -184,15 +184,14 @@ ApplicationWindow {
     Connections {
         target: documentManager
 
-        function onFileUrlChanged() {
-            if (documentManager.getFileUrl.toString() === "") return;
+        function onActiveDocumentChanged() {
+            if (!documentManager.activeDocument) return;
 
-            console.log("[QML] Backend confirmed load success for: " + documentManager.getFileUrl);
+            console.log("[QML] Backend confirmed load success for: " + documentManager.activeDocument.source);
 
             stackView.clear();
-            stackView.push("Readerscreen.qml", {
-                documentSource: documentManager.getFileUrl
-            });
+            // Remove documentSource property since Readerscreen uses documentManager directly
+            stackView.push("Readerscreen.qml");
         }
 
         function onErrorOccurred(errorMessage) {

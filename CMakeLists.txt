@@ -21,6 +21,8 @@ qt_add_executable(appShokaReader
     ./Libraries/DocumentManager/PdfDocument.cpp
     ./Libraries/DocumentManager/DocumentManager.h
     ./Libraries/DocumentManager/DocumentManager.cpp
+    ./Libraries/DocumentManager/DocumentImageProvider.h
+    ./Libraries/DocumentManager/DocumentImageProvider.cpp
 )
 
 qt_add_qml_module(appShokaReader

@@ -1,18 +1,31 @@
 #pragma once
 
+#include <QObject>
 #include <QUrl>
-#include <Qstring> //TODO: may need to remove depnding on file type of m_title
+#include <Qstring>
+#include <QImage>
+#include <QSizeF>
 
-class DocumentBase{
+class DocumentBase : public QObject{
+    Q_OBJECT
+    Q_PROPERTY(QUrl source READ getSource CONSTANT)
+    Q_PROPERTY(int totalPageNumber READ GetTotalPageNumber CONSTANT)
+    Q_PROPERTY(int currentPageNumber READ GetCurrentPageNumber CONSTANT)
+    Q_PROPERTY(QString title READ GetTitle CONSTANT)
 public:
-    DocumentBase();
-    virtual ~DocumentBase() = default;
-    virtual void loadDocument(const QUrl &filePath) = 0;
-    size_t TotalPageNumber();
-    size_t GetCurrentPageNumber();
+    explicit DocumentBase(QObject* parent = nullptr);
+    virtual ~DocumentBase();
+    virtual void getDocumentMetaData(const QUrl &filePath) = 0;
+    Q_INVOKABLE virtual QImage renderPageImage(int pageIndex, const QSize& targetSize) = 0;
+    Q_INVOKABLE virtual QSizeF nativePageSize(int pageIndex) const = 0;
+    QUrl getSource() const;
+    int GetTotalPageNumber() const;
+    int GetCurrentPageNumber() const;
+    QString GetTitle() const;
 
 protected:
-    uint32_t m_totalPageNumber = 0;
-    uint32_t m_currentPageNumber = 0;
-    QString m_title; //TODO: may need to change to another qt class
+    QUrl m_sourceUrl;
+    int m_totalPageNumber = 0;
+    int m_currentPageNumber = 0;
+    QString m_title = "";
 };
