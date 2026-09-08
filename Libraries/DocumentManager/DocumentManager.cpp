@@ -45,16 +45,9 @@ void DocumentManager::openDocument(const QUrl& filePath) {
 
     m_activeEngine->getDocumentMetaData(filePath);
 
-    m_currentType = fileType;
     emit activeDocumentChanged();
-    emit typeChanged();
-
 }
 
 DocumentBase* DocumentManager::activeDocument() const {
     return m_activeEngine.get();
-}
-
-DocumentType DocumentManager::currentType() const {
-    return m_currentType;
 }

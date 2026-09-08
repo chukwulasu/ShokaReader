@@ -13,7 +13,7 @@ if (EXISTS "${CMAKE_CURRENT_LIST_DIR}/importedcontent/CMakeLists.txt")
     add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/importedcontent)
 endif()
 
-qt_add_executable(appShokaReader
+qt_add_executable(ShokaReader
     main.cpp
     ./Libraries/DocumentManager/DocumentBase.h
     ./Libraries/DocumentManager/DocumentBase.cpp
@@ -25,7 +25,7 @@ qt_add_executable(appShokaReader
     ./Libraries/DocumentManager/DocumentImageProvider.cpp
 )
 
-qt_add_qml_module(appShokaReader
+qt_add_qml_module(ShokaReader
     URI ShokaReader
     QML_FILES
         UI/UI_QML_files/Appwindow.qml
@@ -51,20 +51,20 @@ qt_add_qml_module(appShokaReader
 )
 
 # Qt for iOS sets MACOSX_BUNDLE_GUI_IDENTIFIER automatically since Qt 6.1.
-set_target_properties(appShokaReader PROPERTIES
-#   MACOSX_BUNDLE_GUI_IDENTIFIER com.example.appShokaReader
+set_target_properties(ShokaReader PROPERTIES
+#   MACOSX_BUNDLE_GUI_IDENTIFIER com.example.ShokaReader
     MACOSX_BUNDLE_BUNDLE_VERSION ${PROJECT_VERSION}
     MACOSX_BUNDLE_SHORT_VERSION_STRING ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}
     MACOSX_BUNDLE TRUE
     WIN32_EXECUTABLE TRUE
 )
 
-target_link_libraries(appShokaReader PRIVATE
+target_link_libraries(ShokaReader PRIVATE
     Qt6::Quick
     Qt6::Pdf
 )
 
-install(TARGETS appShokaReader
+install(TARGETS ShokaReader
     BUNDLE DESTINATION .
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}

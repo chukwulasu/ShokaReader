@@ -10,7 +10,8 @@ class DocumentBase : public QObject{
     Q_OBJECT
     Q_PROPERTY(QUrl source READ getSource CONSTANT)
     Q_PROPERTY(int totalPageNumber READ GetTotalPageNumber CONSTANT)
-    Q_PROPERTY(int currentPageNumber READ GetCurrentPageNumber CONSTANT)
+    /*Q_PROPERTY(int currentPageNumber READ GetCurrentPageNumber CONSTANT)
+    TODO: either remove it since it's not currently used or change it from CONSTANT to PROPERTY */
     Q_PROPERTY(QString title READ GetTitle CONSTANT)
 public:
     explicit DocumentBase(QObject* parent = nullptr);
@@ -20,12 +21,12 @@ public:
     Q_INVOKABLE virtual QSizeF nativePageSize(int pageIndex) const = 0;
     QUrl getSource() const;
     int GetTotalPageNumber() const;
-    int GetCurrentPageNumber() const;
+    //int GetCurrentPageNumber() const;
     QString GetTitle() const;
 
 protected:
     QUrl m_sourceUrl;
     int m_totalPageNumber = 0;
-    int m_currentPageNumber = 0;
+    int m_currentPageNumber = 1;
     QString m_title = "";
 };
