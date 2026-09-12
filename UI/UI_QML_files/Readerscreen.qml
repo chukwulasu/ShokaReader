@@ -9,18 +9,27 @@ Rectangle {
 
     property int currentPage: 0
     property int totalPages: documentManager.activeDocument ? documentManager.activeDocument.totalPageNumber : 0
+    property real currentZoom: 1.2
+
+    function zoomIn() {
+        if (currentZoom < 3.0) currentZoom += 0.2;
+    }
+
+    function zoomOut() {
+        if (currentZoom > 0.6) currentZoom -= 0.2;
+    }
 
     function goToNextPage() {
         if (listView.currentIndex < totalPages - 1) {
             listView.currentIndex++;
-            listView.positionViewAtIndex(listView.currentIndex, ListView.Beginning);
+            listView.positionViewAtIndex(listView.currentIndex, ListView.Center);
         }
     }
 
     function goToPreviousPage() {
         if (listView.currentIndex > 0) {
             listView.currentIndex--;
-            listView.positionViewAtIndex(listView.currentIndex, ListView.Beginning);
+            listView.positionViewAtIndex(listView.currentIndex, ListView.Center);
         }
     }
 
@@ -39,8 +48,8 @@ Rectangle {
         id: listView
         anchors.fill: parent
         clip: true
-        spacing: 24
-        model: totalPages
+        spacing: 0
+        model: documentManager.activeDocument ? documentManager.activeDocument.pageModel : null
 
         onContentYChanged: {
             let idx = listView.indexAt(contentX, contentY + 20);
@@ -49,7 +58,6 @@ Rectangle {
             }
         }
 
-        // Explicitly add a visible vertical scrollbar
         ScrollBar.vertical: ScrollBar {
             id: vbar
             active: true
@@ -57,37 +65,34 @@ Rectangle {
         }
 
         delegate: Item {
-            width: listView.width
-            // Account for card padding margins in total delegate height
-            height: (documentManager.activeDocument ? documentManager.activeDocument.nativePageSize(index).height * scaleFactor : 1131) + 40
+                    id: pageDelegate
+                    width: listView.width
+                    property real uniformWidth: listView.width * 0.65
+                    property real uniformHeight: uniformWidth * 1.414
+                    property real scaledWidth: uniformWidth * currentZoom
+                    property real scaledHeight: uniformHeight * currentZoom
 
-            property real scaleFactor: 1.2
+                    height: scaledHeight
 
-            // White paper card container to fix transparent PDF blending and text overlap
-            Rectangle {
-                anchors.horizontalCenter: parent.horizontalCenter
-                anchors.top: parent.top
-                anchors.topMargin: 20
+                    Rectangle {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        anchors.top: parent.top
+                        width: scaledWidth
+                        height: scaledHeight
+                        color: "#FFFFFF"
+                        border.color: "#333333"
+                        border.width: 1
 
-                width: documentManager.activeDocument ? documentManager.activeDocument.nativePageSize(index).width * scaleFactor : 800
-                height: documentManager.activeDocument ? documentManager.activeDocument.nativePageSize(index).height * scaleFactor : 1131
-
-                color: "#FFFFFF"
-                border.color: "#333333"
-                border.width: 1
-
-                Image {
-                    id: pageImage
-                    anchors.fill: parent
-                    anchors.margins: 1
-
-                    source: "image://documentProvider/page_" + index
-
-                    fillMode: Image.PreserveAspectFit
-                    asynchronous: true
-                    cache: true
+                        Image {
+                            id: pageImage
+                            anchors.fill: parent
+                            anchors.margins: 1
+                            cache: false
+                            source: "image://documentProvider/page_" + index
+                            fillMode: Image.PreserveAspectFit
+                            asynchronous: true
+                        }
+                    }
                 }
-            }
-        }
     }
 }

@@ -20,7 +20,6 @@ class DocumentManager : public QObject {
 public:
     explicit DocumentManager(QObject* parent = nullptr);
     ~DocumentManager() override = default;
-
     Q_INVOKABLE void openDocument(const QUrl& filePath);
     DocumentBase* activeDocument() const;
     DocumentType GetFileType(const QUrl& qmlFilePath) const;
@@ -30,5 +29,5 @@ signals:
     void errorOccurred(QString errorMessage);
 
 private:
-    std::unique_ptr<DocumentBase> m_activeEngine;
+    std::unique_ptr<DocumentBase> m_activeDocument;
 };

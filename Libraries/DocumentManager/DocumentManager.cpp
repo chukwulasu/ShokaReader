@@ -36,18 +36,18 @@ void DocumentManager::openDocument(const QUrl& filePath) {
     }
 
     if (fileType == DocumentType::PDF) {
-        m_activeEngine = std::make_unique<PdfDocument>();
+       m_activeDocument = std::make_unique<PdfDocument>();
     }
 
     /* else if (type == DocumentType::EPUB) {
-        m_activeEngine = std::make_unique<EpubDocument>();
+       m_activeDocument = std::make_unique<EpubDocument>();
     } */
 
-    m_activeEngine->getDocumentMetaData(filePath);
+   m_activeDocument->getDocumentMetaData(filePath);
 
     emit activeDocumentChanged();
 }
 
 DocumentBase* DocumentManager::activeDocument() const {
-    return m_activeEngine.get();
+    return m_activeDocument.get();
 }

@@ -11,7 +11,9 @@ ApplicationWindow {
     height: 800
     visible: true
     visibility: Window.Maximized
-    title: "ShokaReader"
+    title: (documentManager.activeDocument !== null && stackView.currentItem !== null && stackView.currentItem.objectName === "readerView")
+           ? documentManager.activeDocument.title
+           : "ShokaReader"
 
     RowLayout {
         anchors.fill: parent
@@ -53,9 +55,9 @@ ApplicationWindow {
                 }
 
                 C_ToolbarButton{
-                    id:readingButton
+                    id:activelyReadingButton
                     source: "../../assets/images/ActiveReading.png"
-                    toolTipText: "Active Reading"
+                    toolTipText: "Actively Reading"
                 }
 
                 C_ToolbarButton{
@@ -185,12 +187,10 @@ ApplicationWindow {
         target: documentManager
 
         function onActiveDocumentChanged() {
-            if (!documentManager.activeDocument) return;
+            if (documentManager.activeDocument === null) return;
 
             console.log("[QML] Backend confirmed load success for: " + documentManager.activeDocument.source);
-
             stackView.clear();
-            // Remove documentSource property since Readerscreen uses documentManager directly
             stackView.push("Readerscreen.qml");
         }
 

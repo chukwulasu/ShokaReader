@@ -12,6 +12,7 @@ Rectangle {
             anchors.fill: parent
             source: "../assets/images/Homescreen.png"
             fillMode: Image.Stretch
+            cache: true
         }
     }
 }

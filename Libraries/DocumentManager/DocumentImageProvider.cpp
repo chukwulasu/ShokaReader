@@ -1,16 +1,15 @@
 #include "Libraries/DocumentManager/DocumentImageProvider.h"
 
 DocumentImageProvider::DocumentImageProvider(DocumentManager* docManager)
-    : QQuickImageProvider(QQuickImageProvider::Image), m_docManager(docManager) {
+    : QQuickImageProvider(QQuickImageProvider::Image), m_documentManager(docManager) {
 
 }
 
 QImage DocumentImageProvider::requestImage(const QString &id, QSize *size, const QSize &requestedSize) {
-    if (!m_docManager || !m_docManager->activeDocument()) {
+    if (!m_documentManager || !m_documentManager->activeDocument()) {
         return QImage();
     }
 
-    // Expected format from QML: "page_0", "page_1", etc.
     QStringList parts = id.split('_');
     if (parts.size() < 2) {
         return QImage();
@@ -19,12 +18,11 @@ QImage DocumentImageProvider::requestImage(const QString &id, QSize *size, const
     int pageNum = parts[1].toInt();
     QSize target = requestedSize.isValid() ? requestedSize : QSize(1024, 1414);
 
-    // Call down to the active polymorphic document engine
-    QImage img = m_docManager->activeDocument()->renderPageImage(pageNum, target);
+    QImage pageImage = m_documentManager->activeDocument()->renderPageImage(pageNum, target);
 
     if (size) {
-        *size = img.size();
+        *size = pageImage.size();
     }
 
-    return img.size().isNull() ? QImage() : img;
+    return pageImage.size().isNull() ? QImage() : pageImage;
 }

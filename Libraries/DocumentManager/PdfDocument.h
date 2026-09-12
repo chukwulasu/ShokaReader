@@ -12,7 +12,6 @@ public:
 
     void getDocumentMetaData(const QUrl& filePath) override;
     QImage renderPageImage(int pageIndex, const QSize& targetSize) override;
-    QSizeF nativePageSize(int pageIndex) const override;
 
 private:
     QPdfDocument m_pdfDocument;

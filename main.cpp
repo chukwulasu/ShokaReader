@@ -3,12 +3,19 @@
 #include <QQmlContext>
 #include <QUrl>
 #include <QIcon>
+#include <QSurfaceFormat>
 
 #include "Libraries/DocumentManager/DocumentManager.h"
 #include "Libraries/DocumentManager/DocumentImageProvider.h"
 
 int main(int argc, char* argv[])
 {
+    // GPU logic to prevent overheating
+    QSurfaceFormat format;
+    format.setSwapInterval(1); // use 1 for Phones
+    QSurfaceFormat::setDefaultFormat(format);
+
+    // Rest of the code for handling the application
     QGuiApplication app(argc, argv);
     app.setWindowIcon(QIcon(":/qt/qml/ShokaReader/UI/assets/images/AppIcon.png"));
 
