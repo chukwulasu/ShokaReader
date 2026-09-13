@@ -34,6 +34,7 @@ qt_add_qml_module(ShokaReader
         UI/UI_QML_files/Homescreen.qml
         UI/UI_QML_files/Readerscreen.qml
         UI/UI_QML_files/Custom_Items/C_ToolbarButton.qml
+        UI/UI_QML_files/Custom_Items/C_PageViewer.qml
     RESOURCES
     UI/assets/images/AppIcon.png
     UI/assets/images/Homescreen.png

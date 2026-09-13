@@ -7,7 +7,7 @@ Rectangle {
     objectName: "readerView"
     color: "#121212"
 
-    property int currentPage: 0
+    property int currentPage: 1
     property int totalPages: documentManager.activeDocument ? documentManager.activeDocument.totalPageNumber : 0
     property real currentZoom: 1.2
 
@@ -22,14 +22,23 @@ Rectangle {
     function goToNextPage() {
         if (listView.currentIndex < totalPages - 1) {
             listView.currentIndex++;
-            listView.positionViewAtIndex(listView.currentIndex, ListView.Center);
+            listView.positionViewAtIndex(listView.currentIndex, ListView.Beginning);
         }
     }
 
     function goToPreviousPage() {
         if (listView.currentIndex > 0) {
             listView.currentIndex--;
-            listView.positionViewAtIndex(listView.currentIndex, ListView.Center);
+            listView.positionViewAtIndex(listView.currentIndex, ListView.Beginning);
+        }
+    }
+
+    function jumpToPage(pageNum) {
+        let index = pageNum - 1;
+        if (index >= 0 && index < totalPages) {
+            listView.currentIndex = index;
+            listView.positionViewAtIndex(index,ListView.Beginning);
+            currentPage = pageNum;
         }
     }
 
@@ -53,8 +62,8 @@ Rectangle {
 
         onContentYChanged: {
             let idx = listView.indexAt(contentX, contentY + 20);
-            if (idx >= 0) {
-                currentPage = idx;
+            if (idx >= 0 && idx < totalPages) {
+                currentPage = idx + 1;
             }
         }
 
@@ -93,6 +102,6 @@ Rectangle {
                             asynchronous: true
                         }
                     }
-                }
+        }
     }
 }

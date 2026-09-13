@@ -2,7 +2,6 @@ import QtQuick
 import QtQuick.Layouts
 import QtQuick.Controls
 
-// ToolbarButton.qml
 Item {
     id: root
     property alias source: iconImage.source
@@ -11,8 +10,8 @@ Item {
 
     signal clicked()
 
-    Layout.preferredWidth: 50
-    Layout.preferredHeight: 50
+    Layout.preferredWidth: 40
+    Layout.preferredHeight: 40
 
     Image {
         id: iconImage

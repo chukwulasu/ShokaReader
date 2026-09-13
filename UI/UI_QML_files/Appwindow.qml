@@ -140,21 +140,12 @@ ApplicationWindow {
                         Layout.fillHeight: true
                     }
 
-                    // Page Number Viewer
-                    //TODO: come back here to finish up with pageNumber viewer, just keeping a static one for now here
-                    Item {
-                        Layout.preferredWidth: 50
-                        Layout.preferredHeight: 40
-
-                        Text {
-                            anchors.centerIn: parent
-                            text: (stackView.currentItem && stackView.currentItem.currentPage !== undefined) ? stackView.currentItem.currentPage : "1"
-                            color: "#FFFFFF"
-                            font.pixelSize: 12
-                            font.bold: true
-                        }
+                    C_PageViewer {
+                        id: pageViewer
+                        Layout.preferredWidth: 47
+                        Layout.preferredHeight: 24
+                        reader: stackView.currentItem
                     }
-
                 }
 
             }
