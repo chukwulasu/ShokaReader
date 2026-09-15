@@ -11,6 +11,13 @@ Rectangle {
     property int totalPages: documentManager.activeDocument ? documentManager.activeDocument.totalPageNumber : 0
     property real currentZoom: 1.2
 
+    focus: true
+    activeFocusOnTab: true
+
+    Component.onCompleted: {
+        forceActiveFocus();
+    }
+
     function zoomIn() {
         if (currentZoom < 3.0) currentZoom += 0.2;
     }
@@ -42,13 +49,30 @@ Rectangle {
         }
     }
 
-    focus: true
     Keys.onPressed: (event) => {
-        if (event.key === Qt.Key_Down || event.key === Qt.Key_PageDown) {
+        let scrollStep = 60;
+        if(event.key === Qt.Key_Up){
+            listView.contentY = Math.max(listView.contentY - scrollStep, 0);
+            event.accepted = true;
+        }
+        else if(event.key === Qt.Key_Down){
+            listView.contentY = Math.min(listView.contentY + scrollStep, listView.contentHeight - listView.height);
+            event.accepted = true;
+        }
+        else if (event.key === Qt.Key_PageUp) {
+            goToPreviousPage();
+            event.accepted = true;
+        }
+        else if (event.key === Qt.Key_PageDown) {
             goToNextPage();
             event.accepted = true;
-        } else if (event.key === Qt.Key_Up || event.key === Qt.Key_PageUp) {
-            goToPreviousPage();
+        }
+        else if(event.key === Qt.Key_Home){
+            listView.positionViewAtBeginning();
+            event.accepted = true;
+        }
+        else if(event.key === Qt.Key_End){
+            listView.positionViewAtEnd();
             event.accepted = true;
         }
     }
