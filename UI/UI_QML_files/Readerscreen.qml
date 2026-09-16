@@ -103,6 +103,22 @@ Rectangle {
         spacing: 0
         model: documentManager.activeDocument ? documentManager.activeDocument.pageModel : null
 
+        WheelHandler {
+                id: zoomWheelHandler
+                // Trackpads send pinch-to-zoom as wheel events with the Ctrl modifier
+                acceptedModifiers: Qt.ControlModifier
+
+                onWheel: (event) => {
+                    // event.angleDelta.y indicates zoom direction on trackpad pinch
+                    if (event.angleDelta.y > 0) {
+                        zoomIn();
+                    } else if (event.angleDelta.y < 0) {
+                        zoomOut();
+                    }
+                    event.accepted = true; // Stop it from scrolling the page when zooming
+                }
+        }
+
         onContentYChanged: {
             let idx = listView.indexAt(contentX, contentY + 20);
             if (idx >= 0 && idx < totalPages) {
