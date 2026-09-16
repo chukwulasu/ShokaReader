@@ -68,14 +68,14 @@ ApplicationWindow {
 
                 // Spacer item to push all buttons to the top and absorb remaining space when in Homescreen
                 Item{
-                    visible: !(stackView.currentItem && stackView.currentItem.objectName === "readerView")
+                    visible: !(stackView.currentItem !== null && stackView.currentItem.objectName === "readerView")
                     Layout.fillHeight: true
                 }
 
                 //ReaderScreen specific buttons
                 ColumnLayout{
                     spacing: 0
-                    visible: stackView.currentItem && stackView.currentItem.objectName === "readerView"
+                    visible: stackView.currentItem !== null && stackView.currentItem.objectName === "readerView"
 
                     C_ToolbarButton{
                         id:tableOfContentsButton
@@ -92,9 +92,10 @@ ApplicationWindow {
                     C_ToolbarButton{
                         id:zoomInButton
                         source: "../../assets/images/ZoomIn.png"
-                        toolTipText: "Zoom In"
+                        shortcut: "Ctrl + Shift + ="
+                        toolTipText: "Zoom In(Ctrl + Shift + =)"
                         onClicked:{
-                            if (stackView.currentItem && typeof stackView.currentItem.zoomIn === "function")
+                            if (stackView.currentItem !== null && stackView.currentItem.objectName === "readerView")
                                 stackView.currentItem.zoomIn();
                         }
                     }
@@ -102,9 +103,10 @@ ApplicationWindow {
                     C_ToolbarButton{
                         id:zoomOutButton
                         source: "../../assets/images/ZoomOut.png"
-                        toolTipText: "Zoom Out"
+                        shortcut: "Ctrl + Shift + -"
+                        toolTipText: "Zoom Out(Ctrl + Shift + -)"
                         onClicked:{
-                            if (stackView.currentItem && typeof stackView.currentItem.zoomOut === "function")
+                            if (stackView.currentItem !== null && stackView.currentItem.objectName === "readerView")
                                 stackView.currentItem.zoomOut();
                         }
                     }
@@ -112,9 +114,10 @@ ApplicationWindow {
                     C_ToolbarButton{
                         id:rotateLeftButton
                         source: "../../assets/images/RotateLeft.png"
-                        toolTipText: "Rotate Left"
+                        shortcut: "Ctrl + L"
+                        toolTipText: "Rotate Left(Ctrl + L)"
                         onClicked: {
-                            if (stackView.currentItem && typeof stackView.currentItem.rotateLeft === "function")
+                            if (stackView.currentItem !== null && stackView.currentItem.objectName === "readerView")
                                 stackView.currentItem.rotateLeft();
                         }
                     }
@@ -122,9 +125,10 @@ ApplicationWindow {
                     C_ToolbarButton{
                         id:rotateRigthButton
                         source: "../../assets/images/RotateRight.png"
-                        toolTipText: "Rotate Right"
+                        shortcut: "Ctrl + R"
+                        toolTipText: "Rotate Right(Ctrl + R)"
                         onClicked:{
-                            if (stackView.currentItem && typeof stackView.currentItem.rotateRight === "function")
+                            if (stackView.currentItem !== null && stackView.currentItem.objectName === "readerView")
                                 stackView.currentItem.rotateRight();
                         }
                     }

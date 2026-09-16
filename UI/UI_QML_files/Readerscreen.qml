@@ -9,7 +9,8 @@ Rectangle {
 
     property int currentPage: 1
     property int totalPages: documentManager.activeDocument ? documentManager.activeDocument.totalPageNumber : 0
-    property real currentZoom: 1.2
+    property real currentZoom: 1
+    property real pageRotation: 0
 
     focus: true
     activeFocusOnTab: true
@@ -46,6 +47,24 @@ Rectangle {
             listView.currentIndex = index;
             listView.positionViewAtIndex(index,ListView.Beginning);
             currentPage = pageNum;
+        }
+    }
+
+    function rotateRight(){
+        if(pageRotation === 270){
+                pageRotation = 0;
+        }
+        else{
+            pageRotation += 90;
+        }
+    }
+
+    function rotateLeft(){
+        if(pageRotation === 0){
+            pageRotation = 270;
+        }
+        else{
+            pageRotation -= 90;
         }
     }
 
@@ -99,19 +118,19 @@ Rectangle {
 
         delegate: Item {
                     id: pageDelegate
-                    width: listView.width
                     property real uniformWidth: listView.width * 0.65
                     property real uniformHeight: uniformWidth * 1.414
                     property real scaledWidth: uniformWidth * currentZoom
                     property real scaledHeight: uniformHeight * currentZoom
-
-                    height: scaledHeight
+                    width: listView.width
+                    height: (pageRotation === 90 || pageRotation === 270) ? scaledWidth : scaledHeight
 
                     Rectangle {
                         anchors.horizontalCenter: parent.horizontalCenter
-                        anchors.top: parent.top
+                        anchors.centerIn: parent
                         width: scaledWidth
                         height: scaledHeight
+                        rotation: pageRotation
                         color: "#FFFFFF"
                         border.color: "#333333"
                         border.width: 1
