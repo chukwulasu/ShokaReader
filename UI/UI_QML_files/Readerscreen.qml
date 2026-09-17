@@ -130,6 +130,7 @@ Rectangle {
             id: vbar
             active: true
             policy: ScrollBar.AlwaysOn
+            stepSize: 1/totalPages
         }
 
         delegate: Item {
