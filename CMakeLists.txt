@@ -4,7 +4,9 @@ project(ShokaReader VERSION 0.1 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-find_package(Qt6 REQUIRED COMPONENTS Quick Pdf)
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(PopplerQt6 REQUIRED IMPORTED_TARGET poppler-qt6)
+find_package(Qt6 REQUIRED COMPONENTS Quick)
 
 qt_standard_project_setup(REQUIRES 6.10)
 
@@ -64,7 +66,7 @@ set_target_properties(ShokaReader PROPERTIES
 
 target_link_libraries(ShokaReader PRIVATE
     Qt6::Quick
-    Qt6::Pdf
+    PkgConfig::PopplerQt6
 )
 
 install(TARGETS ShokaReader

@@ -18,7 +18,7 @@ public:
     explicit DocumentBase(QObject* parent = nullptr);
     virtual ~DocumentBase();
     virtual void getDocumentMetaData(const QUrl &filePath) = 0;
-    Q_INVOKABLE virtual QImage renderPageImage(int pageIndex, const QSize& targetSize) = 0;
+    virtual QImage renderPageImage(int pageIndex, const QSize& targetSize) = 0;
     QUrl getSource() const;
     int GetTotalPageNumber() const;
     QString GetTitle() const;

@@ -1,6 +1,7 @@
 #pragma once
 
-#include <QPdfDocument>
+#include <memory>
+#include <poppler/qt6/poppler-qt6.h>
 #include "Libraries/DocumentManager/DocumentBase.h"
 
 class PdfDocument : public DocumentBase {
@@ -14,5 +15,5 @@ public:
     QImage renderPageImage(int pageIndex, const QSize& targetSize) override;
 
 private:
-    QPdfDocument m_pdfDocument;
+    std::unique_ptr<Poppler::Document> m_pdfDocument = nullptr;
 };

@@ -6,7 +6,7 @@ DocumentImageProvider::DocumentImageProvider(DocumentManager* docManager)
 }
 
 QImage DocumentImageProvider::requestImage(const QString &id, QSize *size, const QSize &requestedSize) {
-    if (!m_documentManager || !m_documentManager->activeDocument()) {
+    if (m_documentManager == nullptr || m_documentManager->activeDocument() == nullptr) {
         return QImage();
     }
 
