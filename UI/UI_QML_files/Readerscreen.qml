@@ -28,25 +28,26 @@ Rectangle {
     }
 
     function goToNextPage() {
-        if (listView.currentIndex < totalPages - 1) {
-            listView.currentIndex++;
+        if (currentPage < totalPages) {
+            currentPage++;
+            listView.currentIndex = currentPage - 1;
             listView.positionViewAtIndex(listView.currentIndex, ListView.Beginning);
         }
     }
 
     function goToPreviousPage() {
-        if (listView.currentIndex > 0) {
-            listView.currentIndex--;
+        if (currentPage > 1) {
+            currentPage--;
+            listView.currentIndex = currentPage - 1;
             listView.positionViewAtIndex(listView.currentIndex, ListView.Beginning);
         }
     }
 
     function jumpToPage(pageNum) {
-        let index = pageNum - 1;
-        if (index >= 0 && index < totalPages) {
-            listView.currentIndex = index;
-            listView.positionViewAtIndex(index,ListView.Beginning);
-            currentPage = pageNum;
+        currentPage = pageNum;
+        if (currentPage > 0 && currentPage <= totalPages) {
+            listView.currentIndex = currentPage - 1;
+            listView.positionViewAtIndex(listView.currentIndex, ListView.Beginning);
         }
     }
 
@@ -87,10 +88,14 @@ Rectangle {
             event.accepted = true;
         }
         else if(event.key === Qt.Key_Home){
+            currentPage = 1;
+            listView.currentIndex = 0;
             listView.positionViewAtBeginning();
             event.accepted = true;
         }
         else if(event.key === Qt.Key_End){
+            currentPage = totalPages;
+            listView.currentIndex = totalPages - 1;
             listView.positionViewAtEnd();
             event.accepted = true;
         }
