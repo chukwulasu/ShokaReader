@@ -15,6 +15,13 @@ ApplicationWindow {
            ? documentManager.activeDocument.title
            : "ShokaReader"
 
+    Component.onCompleted: {
+            if (documentManager.activeDocument !== null) {
+                stackView.clear();
+                stackView.push("Readerscreen.qml");
+            }
+        }
+
     RowLayout {
         anchors.fill: parent
         spacing: 0

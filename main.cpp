@@ -4,7 +4,6 @@
 #include <QUrl>
 #include <QIcon>
 #include <QSurfaceFormat>
-
 #include "Libraries/DocumentManager/DocumentManager.h"
 #include "Libraries/DocumentManager/DocumentImageProvider.h"
 
@@ -27,6 +26,14 @@ int main(int argc, char* argv[])
 
     // Register the custom image provider to bridge C++ QImage rendering to QML Image elements
     engine.addImageProvider(QStringLiteral("documentProvider"), new DocumentImageProvider(&globalDocManager));
+
+    // Check if a file path was passed via command line or with Open With from file explorer)
+    QStringList args = app.arguments();
+    if (args.count() > 1) {
+        QString filePath = args.at(1);
+        QUrl fileUrl = QUrl::fromLocalFile(filePath);
+        globalDocManager.openDocument(fileUrl);
+    }
 
     const QUrl applicationQmlUrl(QStringLiteral("qrc:/qt/qml/ShokaReader/UI/UI_QML_files/Appwindow.qml"));
     QObject::connect(&engine, &QQmlApplicationEngine::objectCreationFailed,
