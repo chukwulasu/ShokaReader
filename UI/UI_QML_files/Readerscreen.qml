@@ -20,11 +20,13 @@ Rectangle {
     }
 
     function zoomIn() {
-        if (currentZoom < 3.0) currentZoom += 0.2;
+        if (currentZoom < 6.0)
+            currentZoom += 0.2;
     }
 
     function zoomOut() {
-        if (currentZoom > 0.6) currentZoom -= 0.2;
+        if (currentZoom > 0.6) 
+            currentZoom -= 0.2;
     }
 
     function goToNextPage() {
@@ -53,7 +55,7 @@ Rectangle {
 
     function rotateRight(){
         if(pageRotation === 270){
-                pageRotation = 0;
+            pageRotation = 0;
         }
         else{
             pageRotation += 90;
@@ -79,6 +81,14 @@ Rectangle {
             listView.contentY = Math.min(listView.contentY + scrollStep, listView.contentHeight - listView.height);
             event.accepted = true;
         }
+        else if(event.key === Qt.Key_Left){
+            listView.contentX = Math.max(listView.contentX - scrollStep, 0);
+            event.accepted = true;
+        }
+        else if(event.key === Qt.Key_Right){
+            listView.contentX = Math.min(listView.contentX + scrollStep, listView.contentWidth - listView.width);
+            event.accepted = true;
+        }
         else if (event.key === Qt.Key_PageUp) {
             goToPreviousPage();
             event.accepted = true;
@@ -102,71 +112,101 @@ Rectangle {
     }
 
     ListView {
-        id: listView
-        anchors.fill: parent
-        clip: true
-        spacing: 0
-        model: documentManager.activeDocument ? documentManager.activeDocument : null
+            id: listView
+            anchors.fill: parent
+            clip: true
+            spacing: 0
+            model: documentManager.activeDocument ? documentManager.activeDocument : null
 
-        WheelHandler {
-                id: zoomWheelHandler
-                // Trackpads send pinch-to-zoom as wheel events with the Ctrl modifier
-                acceptedModifiers: Qt.ControlModifier
+            WheelHandler {
+                    id: zoomWheelHandler
+                    // Trackpads send pinch-to-zoom as wheel events with the Ctrl modifier
+                    acceptedModifiers: Qt.ControlModifier
 
-                onWheel: (event) => {
-                    // event.angleDelta.y indicates zoom direction on trackpad pinch
-                    if (event.angleDelta.y > 0) {
-                        zoomIn();
-                    } else if (event.angleDelta.y < 0) {
-                        zoomOut();
+                    onWheel: (event) => {
+                        // event.angleDelta.y indicates zoom direction on trackpad pinch
+                        if (event.angleDelta.y > 0) {
+                            zoomIn();
+                        } else if (event.angleDelta.y < 0) {
+                            zoomOut();
+                        }
+                        event.accepted = true; // Stop it from scrolling the page when zooming
                     }
-                    event.accepted = true; // Stop it from scrolling the page when zooming
-                }
-        }
+            }
 
-        onContentYChanged: {
-            let idx = listView.indexAt(contentX, contentY + 20);
-            if (idx >= 0 && idx < totalPages) {
-                currentPage = idx + 1;
+            onContentYChanged: {
+                let idx = listView.indexAt(contentX, contentY + 20);
+                if (idx >= 0 && idx < totalPages) {
+                    currentPage = idx + 1;
+                }
+            }
+
+
+            flickableDirection: Flickable.HorizontalAndVerticalFlick
+
+            // This forces the horizontal scrollbar handle to shrink and stops it from snapping back.
+            contentWidth: {
+                let maxW = listView.width;
+                for (let i = 0; i < contentItem.children.length; ++i) {
+                    let child = contentItem.children[i];
+                    if (child.width && child.width > maxW) {
+                        maxW = child.width;
+                    }
+                }
+                return maxW;
+            }
+
+            ScrollBar.vertical: ScrollBar {
+                        id: vbar
+                        parent: listView.parent
+                        anchors.top: listView.top
+                        anchors.bottom: listView.bottom
+                        anchors.right: listView.right
+                        active: true
+                        policy: ScrollBar.AlwaysOn
+                        stepSize: 1 / totalPages
+                    }
+
+            ScrollBar.horizontal: ScrollBar {
+                id: hbar
+                parent: listView.parent
+                anchors.left: listView.left
+                anchors.right: listView.right
+                anchors.bottom: listView.bottom
+                active: true
+                policy: ScrollBar.AlwaysOn
+            }
+
+            delegate: Item {
+                id: pageDelegate
+                property real uniformWidth: listView.width * 0.65
+                property real uniformHeight: uniformWidth * 1.414
+                property real scaledWidth: uniformWidth * currentZoom
+                property real scaledHeight: uniformHeight * currentZoom
+                property real effectivePageWidth: (pageRotation === 90 || pageRotation === 270) ? scaledHeight : scaledWidth
+                property real effectivePageHeight: (pageRotation === 90 || pageRotation === 270) ? scaledWidth : scaledHeight
+                width: Math.max(listView.width, effectivePageWidth + 80)
+                height: effectivePageHeight + 40
+
+                Rectangle {
+                    anchors.centerIn: parent
+                    width: scaledWidth
+                    height: scaledHeight
+                    rotation: pageRotation
+                    color: "#FFFFFF"
+                    border.color: "#333333"
+                    border.width: 1
+
+                    Image {
+                        id: pageImage
+                        anchors.fill: parent
+                        anchors.margins: 1
+                        cache: false
+                        source: "image://documentProvider/page_" + index
+                        fillMode: Image.PreserveAspectFit
+                        asynchronous: true
+                    }
+                }
             }
         }
-
-        ScrollBar.vertical: ScrollBar {
-            id: vbar
-            active: true
-            policy: ScrollBar.AlwaysOn
-            stepSize: 1/totalPages
-        }
-
-        delegate: Item {
-                    id: pageDelegate
-                    property real uniformWidth: listView.width * 0.65
-                    property real uniformHeight: uniformWidth * 1.414
-                    property real scaledWidth: uniformWidth * currentZoom
-                    property real scaledHeight: uniformHeight * currentZoom
-                    width: listView.width
-                    height: (pageRotation === 90 || pageRotation === 270) ? scaledWidth : scaledHeight
-
-                    Rectangle {
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        anchors.centerIn: parent
-                        width: scaledWidth
-                        height: scaledHeight
-                        rotation: pageRotation
-                        color: "#FFFFFF"
-                        border.color: "#333333"
-                        border.width: 1
-
-                        Image {
-                            id: pageImage
-                            anchors.fill: parent
-                            anchors.margins: 1
-                            cache: false
-                            source: "image://documentProvider/page_" + index
-                            fillMode: Image.PreserveAspectFit
-                            asynchronous: true
-                        }
-                    }
-        }
-    }
 }
