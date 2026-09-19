@@ -25,8 +25,6 @@ qt_add_executable(ShokaReader
     ./Libraries/DocumentManager/DocumentManager.cpp
     ./Libraries/DocumentManager/DocumentImageProvider.h
     ./Libraries/DocumentManager/DocumentImageProvider.cpp
-    ./Libraries/DocumentManager/DocumentPageModel.h
-    ./Libraries/DocumentManager/DocumentPageModel.cpp
 )
 
 qt_add_qml_module(ShokaReader

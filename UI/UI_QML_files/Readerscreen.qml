@@ -106,7 +106,7 @@ Rectangle {
         anchors.fill: parent
         clip: true
         spacing: 0
-        model: documentManager.activeDocument ? documentManager.activeDocument.pageModel : null
+        model: documentManager.activeDocument ? documentManager.activeDocument : null
 
         WheelHandler {
                 id: zoomWheelHandler

@@ -1,9 +1,8 @@
 #include "Libraries/DocumentManager/DocumentBase.h"
-#include "DocumentPageModel.h"
 
 DocumentBase::DocumentBase(QObject* parent)
-    : QObject(parent){
-    m_pageModel = new DocumentPageModel(this, this);
+    : QAbstractListModel(parent){
+
 }
 
 DocumentBase::~DocumentBase() = default;
@@ -20,6 +19,21 @@ QUrl DocumentBase::getSource() const{
     return m_fileUrl;
 }
 
-QAbstractListModel* DocumentBase::getPageModel() const {
-    return m_pageModel;
+int DocumentBase::rowCount(const QModelIndex &parent) const {
+    if (parent.isValid() == true) {
+        return 0;
+    }
+    return m_totalPageNumber;
+}
+
+QVariant DocumentBase::data(const QModelIndex &index, int role) const {
+    if (index.isValid() == false || index.row() < 0 || index.row() >= m_totalPageNumber) {
+        return QVariant();
+    }
+
+    if (role == Qt::DisplayRole) {
+        return index.row();
+    }
+
+    return QVariant();
 }
