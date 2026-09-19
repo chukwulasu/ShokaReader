@@ -34,5 +34,5 @@ QImage PdfDocument::renderPageImage(int pageIndex, const QSize& targetSize) {
     if (pdfPage == nullptr) {
         return QImage();
     }
-    return pdfPage->renderToImage(250, 250,targetSize.width(),targetSize.height());
+    return pdfPage->renderToImage(120, 120,targetSize.width(),targetSize.height());
 }
