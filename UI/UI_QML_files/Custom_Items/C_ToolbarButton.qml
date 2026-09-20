@@ -3,7 +3,7 @@ import QtQuick.Layouts
 import QtQuick.Controls
 
 Item {
-    id: root
+    id: toolbarButton
     property alias source: iconImage.source
     property alias shortcut: keyShortcut.sequence
     property string toolTipText: ""
@@ -25,15 +25,15 @@ Item {
         id: mouseArea
         anchors.fill: parent
         hoverEnabled: true
-        onClicked: root.clicked()
-        ToolTip.visible: mouseArea.containsMouse && root.toolTipText !== ""
-        ToolTip.text: root.toolTipText
+        onClicked: toolbarButton.clicked()
+        ToolTip.visible: mouseArea.containsMouse && toolbarButton.toolTipText !== ""
+        ToolTip.text: toolbarButton.toolTipText
         ToolTip.delay: 300
     }
 
     Shortcut {
             id: keyShortcut
-            onActivated: root.clicked()
+            onActivated: toolbarButton.clicked()
         }
 
 }

@@ -42,7 +42,7 @@ Item {
         onAccepted: {
             if (pageViewer.reader !== null) {
                 let pageNum = Number(text);
-                if (text !== "" && !isNaN(pageNum)) {
+                if (text !== "" && isNaN(pageNum) === false) {
                     pageViewer.reader.jumpToPage(pageNum);
                 }
                 text = "";

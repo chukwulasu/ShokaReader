@@ -88,6 +88,10 @@ ApplicationWindow {
                         id:tableOfContentsButton
                         source: "../../assets/images/Table_of_contents.png"
                         toolTipText: "Table of Contents"
+                        onClicked: {
+                            if (stackView.currentItem !== null && stackView.currentItem.objectName === "readerView")
+                                stackView.currentItem.isTableOfContentsVisible = !stackView.currentItem.isTableOfContentsVisible
+                        }
                     }
 
                     C_ToolbarButton{
@@ -191,7 +195,7 @@ ApplicationWindow {
         function onActiveDocumentChanged() {
             if (documentManager.activeDocument === null) return;
 
-            console.log("[QML] Backend confirmed load success for: " + documentManager.activeDocument.source);
+            console.log("[QML] Backend confirmed load success for: " + documentManager.activeDocument.fileUrl);
             stackView.clear();
             stackView.push("Readerscreen.qml");
         }

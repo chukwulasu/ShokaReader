@@ -1,7 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
-
+import "Custom_Items"
 Rectangle {
     id: readerScreen
     objectName: "readerView"
@@ -11,6 +11,7 @@ Rectangle {
     property int totalPages: documentManager.activeDocument ? documentManager.activeDocument.totalPageNumber : 0
     property real currentZoom: 1
     property real pageRotation: 0
+    property bool isTableOfContentsVisible: false
 
     focus: true
     activeFocusOnTab: true
@@ -25,7 +26,7 @@ Rectangle {
     }
 
     function zoomOut() {
-        if (currentZoom > 0.6) 
+        if (currentZoom > 0.6)
             currentZoom -= 0.2;
     }
 
@@ -111,27 +112,47 @@ Rectangle {
         }
     }
 
-    ListView {
-            id: listView
+    Item{ /*RowLayout not used because the rectangle on the scroll bar was out
+            of place and ran into other issues trying to work around using the
+            RowLayout */
             anchors.fill: parent
-            clip: true
-            spacing: 0
-            model: documentManager.activeDocument ? documentManager.activeDocument : null
+            C_TableOfContentsSidebar{
+                id:tableOfContents
+                visible: isTableOfContentsVisible
+                reader: readerScreen
+                anchors{
+                    left: parent.left
+                    top: parent.top
+                    bottom: parent.bottom
+                }
+            }
+
+            ListView {
+                id: listView
+                anchors {
+                    left: isTableOfContentsVisible ? tableOfContents.right : parent.left
+                    right: parent.right
+                    top: parent.top
+                    bottom: parent.bottom
+                }
+                clip: true
+                spacing: 0
+                model: documentManager.activeDocument ? documentManager.activeDocument : null
 
             WheelHandler {
-                    id: zoomWheelHandler
-                    // Trackpads send pinch-to-zoom as wheel events with the Ctrl modifier
-                    acceptedModifiers: Qt.ControlModifier
+                id: zoomWheelHandler
+                // Trackpads send pinch-to-zoom as wheel events with the Ctrl modifier
+                acceptedModifiers: Qt.ControlModifier
 
-                    onWheel: (event) => {
-                        // event.angleDelta.y indicates zoom direction on trackpad pinch
-                        if (event.angleDelta.y > 0) {
-                            zoomIn();
-                        } else if (event.angleDelta.y < 0) {
-                            zoomOut();
-                        }
-                        event.accepted = true; // Stop it from scrolling the page when zooming
+                onWheel: (event) => {
+                    // event.angleDelta.y indicates zoom direction on trackpad pinch
+                    if (event.angleDelta.y > 0) {
+                        zoomIn();
+                    } else if (event.angleDelta.y < 0) {
+                        zoomOut();
                     }
+                    event.accepted = true; // Stop it from scrolling the page when zooming
+                }
             }
 
             onContentYChanged: {
@@ -157,19 +178,19 @@ Rectangle {
             }
 
             ScrollBar.vertical: ScrollBar {
-                        id: vbar
-                        parent: listView.parent
-                        anchors.top: listView.top
-                        anchors.bottom: listView.bottom
-                        anchors.right: listView.right
-                        active: true
-                        policy: ScrollBar.AlwaysOn
-                        stepSize: 1 / totalPages
-                    }
+                id: vbar
+                parent: listView.parent
+                anchors.top: listView.top
+                anchors.bottom: listView.bottom
+                anchors.right: listView.right
+                active: true
+                policy: ScrollBar.AlwaysOn
+                stepSize: 1 / totalPages
+            }
 
             ScrollBar.horizontal: ScrollBar {
                 id: hbar
-                parent: listView.parent
+                parent: listView
                 anchors.left: listView.left
                 anchors.right: listView.right
                 anchors.bottom: listView.bottom
@@ -209,4 +230,5 @@ Rectangle {
                 }
             }
         }
+    }
 }
