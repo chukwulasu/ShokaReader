@@ -180,24 +180,25 @@ Rectangle {
             ScrollBar.vertical: ScrollBar {
                 id: vbar
                 parent: listView.parent
-                anchors.top: listView.top
-                anchors.bottom: listView.bottom
-                anchors.right: listView.right
+                x: listView.x + listView.width - width
+                y: listView.y
+                height: listView.height
                 active: true
                 policy: ScrollBar.AlwaysOn
                 stepSize: 1 / totalPages
+                z: 100
             }
 
             ScrollBar.horizontal: ScrollBar {
                 id: hbar
-                parent: listView
-                anchors.left: listView.left
-                anchors.right: listView.right
-                anchors.bottom: listView.bottom
+                parent: listView.parent
+                x: listView.x
+                y: listView.y + listView.height - height
+                width: listView.width - vbar.width
                 active: true
                 policy: ScrollBar.AlwaysOn
+                z: 100
             }
-
             delegate: Item {
                 id: pageDelegate
                 property real uniformWidth: listView.width * 0.65
