@@ -44,6 +44,7 @@ ApplicationWindow {
                     onClicked: {
                         stackView.clear();
                         stackView.push("Homescreen.qml");
+                        documentManager.releaseDocument();
                     }
                 }
 

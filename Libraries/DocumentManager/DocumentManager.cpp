@@ -48,6 +48,11 @@ void DocumentManager::openDocument(const QUrl& filePath) {
     emit activeDocumentChanged();
 }
 
+void DocumentManager::releaseDocument(){
+    if(m_activeDocument != nullptr)
+        m_activeDocument = nullptr;
+}
+
 DocumentBase* DocumentManager::activeDocument() const {
     return m_activeDocument.get();
 }

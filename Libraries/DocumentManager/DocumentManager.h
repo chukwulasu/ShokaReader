@@ -21,6 +21,7 @@ public:
     explicit DocumentManager(QObject* parent = nullptr);
     ~DocumentManager() override = default;
     Q_INVOKABLE void openDocument(const QUrl& filePath);
+    Q_INVOKABLE void releaseDocument();
     DocumentBase* activeDocument() const;
     DocumentType GetFileType(const QUrl& qmlFilePath) const;
 
