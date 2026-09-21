@@ -96,7 +96,7 @@ Rectangle {
             }
         }
 
-        // Search Bar with clear button
+        // Table of Contents Search Bar
         TextField {
             id: searchField
             width: parent.width
@@ -104,6 +104,7 @@ Rectangle {
             placeholderText: "Search bookmarks"
             leftPadding: 32
             rightPadding: 30
+            verticalAlignment: TextInput.AlignVCenter
 
             Text {
                 text: "🔍"
