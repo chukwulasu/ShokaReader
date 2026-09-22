@@ -36,7 +36,56 @@ QImage PdfDocument::renderPageImage(int pageIndex, const QSize& targetSize) {
     if (pdfPage == nullptr) {
         return QImage();
     }
-    return pdfPage->renderToImage(120, 120,targetSize.width(),targetSize.height());
+
+    QSizeF pageSize = pdfPage->pageSizeF();
+    if (pageSize.width() <= 0 || pageSize.height() <= 0)
+        return QImage();
+
+    int renderWidth = targetSize.isValid() ? targetSize.width() : 1024;
+    double dpi = (static_cast<double>(renderWidth) / pageSize.width()) * 72.0;
+
+    return pdfPage->renderToImage(dpi, dpi);
+}
+
+QSizeF PdfDocument::getPageSizePoints(int pageIndex) {
+    if (m_pdfDocument == nullptr || pageIndex < 0 || pageIndex >= m_totalPageNumber) {
+        return QSizeF(0, 0);
+    }
+    std::unique_ptr<Poppler::Page> pdfPage(m_pdfDocument->page(pageIndex));
+    if (pdfPage == nullptr) {
+        return QSizeF(0, 0);
+    }
+    return pdfPage->pageSizeF();
+}
+
+QVariantList PdfDocument::getPageTextRects(int pageIndex) {
+    QVariantList rectsList;
+    if (m_pdfDocument == nullptr || pageIndex < 0 || pageIndex >= m_totalPageNumber) {
+        return rectsList;
+    }
+
+    std::unique_ptr<Poppler::Page> pdfPage(m_pdfDocument->page(pageIndex));
+    if (pdfPage == nullptr) {
+        return rectsList;
+    }
+
+    std::vector<std::unique_ptr<Poppler::TextBox>> textList = pdfPage->textList();
+    for (const auto& box : textList) {
+        if (!box) continue;
+
+        QVariantMap wordMap;
+        wordMap["text"] = box->text();
+
+        QRectF rect = box->boundingBox();
+        wordMap["x"] = rect.x();
+        wordMap["y"] = rect.y();
+        wordMap["width"] = rect.width();
+        wordMap["height"] = rect.height();
+
+        rectsList.append(wordMap);
+    }
+
+    return rectsList;
 }
 
 // Recursive helper function to parse Poppler's TOC tree

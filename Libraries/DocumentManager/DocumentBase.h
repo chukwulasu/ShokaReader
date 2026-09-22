@@ -23,6 +23,8 @@ public:
     virtual void getDocumentMetaData(const QUrl &filePath) = 0;
     virtual QImage renderPageImage(int pageIndex, const QSize& targetSize) = 0;
     virtual QVariantList getTableOfContents() = 0;
+    Q_INVOKABLE virtual QVariantList getPageTextRects(int pageIndex) = 0;
+    Q_INVOKABLE virtual QSizeF getPageSizePoints(int pageIndex) = 0;
     QUrl getFileUrl() const;
     int GetTotalPageNumber() const;
     QString GetTitle() const;
