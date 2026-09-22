@@ -138,6 +138,7 @@ Rectangle {
                 }
                 clip: true
                 spacing: 0
+                cacheBuffer: 1000 // Keeps delegates instantiated outside the visible area for smoother scrolling
                 model: documentManager.activeDocument ? documentManager.activeDocument : null
 
             WheelHandler {
@@ -367,7 +368,8 @@ Rectangle {
                     Image {
                         id: pageImage
                         anchors.fill: parent
-                        cache: false
+                        cache: false // Keeping image cache disabled per user setup
+                        retainWhileLoading: true // Keeps previous image visible during asynchronous source changes to reduce flashing
                         source: "image://documentProvider/page_" + index
                         fillMode: Image.PreserveAspectFit
                         asynchronous: true

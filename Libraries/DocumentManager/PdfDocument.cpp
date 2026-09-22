@@ -28,6 +28,8 @@ void PdfDocument::getDocumentMetaData(const QUrl& filePath) {
 }
 
 QImage PdfDocument::renderPageImage(int pageIndex, const QSize& targetSize) {
+    Q_UNUSED(targetSize);
+
     if (m_pdfDocument == nullptr || pageIndex < 0 || pageIndex >= m_totalPageNumber) {
         return QImage();
     }
@@ -37,14 +39,9 @@ QImage PdfDocument::renderPageImage(int pageIndex, const QSize& targetSize) {
         return QImage();
     }
 
-    QSizeF pageSize = pdfPage->pageSizeF();
-    if (pageSize.width() <= 0 || pageSize.height() <= 0)
-        return QImage();
+    constexpr double renderDpi = 180.0; //180 DPI gave the best result so don't change it
 
-    int renderWidth = targetSize.isValid() ? targetSize.width() : 1024;
-    double dpi = (static_cast<double>(renderWidth) / pageSize.width()) * 72.0;
-
-    return pdfPage->renderToImage(dpi, dpi);
+    return pdfPage->renderToImage(renderDpi, renderDpi);
 }
 
 QSizeF PdfDocument::getPageSizePoints(int pageIndex) {
