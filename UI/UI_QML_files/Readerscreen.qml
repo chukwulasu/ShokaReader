@@ -401,15 +401,9 @@ Rectangle {
                         acceptedButtons: Qt.LeftButton
                         preventStealing: true
 
-                        onClicked: (mouse) => {
-                            // Single click clears the highlight
-                            pageContainer.selectionStartIndex = -1;
-                            pageContainer.selectionEndIndex = -1;
-                            pageContainer.extractedText = "";
-                        }
-
-                        onDoubleClicked: (mouse) => {
+                        onPressed: (mouse) => {
                             if (textRects.length === 0) return;
+                            // Clear previous selection and start fresh on press for trackpad/mouse compatibility
                             pageContainer.isSelecting = true;
                             let pt = pageContainer.mapMouseToPdf(mouse.x, mouse.y);
                             let idx = pageContainer.findNearestWordIndex(pt);
@@ -433,6 +427,14 @@ Rectangle {
                             let minIdx = Math.min(pageContainer.selectionStartIndex, pageContainer.selectionEndIndex);
                             let maxIdx = Math.max(pageContainer.selectionStartIndex, pageContainer.selectionEndIndex);
 
+                            // If start and end index are identical (just a click without dragging), clear selection
+                            if (minIdx === maxIdx) {
+                                pageContainer.selectionStartIndex = -1;
+                                pageContainer.selectionEndIndex = -1;
+                                pageContainer.extractedText = "";
+                                return;
+                            }
+
                             let collectedText = "";
                             for (let i = minIdx; i <= maxIdx; i++) {
                                 collectedText += textRects[i].text + " ";
@@ -440,7 +442,7 @@ Rectangle {
 
                             if (collectedText.trim().length > 0) {
                                 pageContainer.extractedText = collectedText.trim();
-                                console.log("[QML] Double-Click Range Selection Success! Copied text: " + pageContainer.extractedText);
+                                console.log("[QML] Range Selection Success! Copied text: " + pageContainer.extractedText);
                             }
                         }
                     }
