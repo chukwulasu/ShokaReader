@@ -73,6 +73,18 @@ Rectangle {
         }
     }
 
+    function goToFirstPage(){
+        currentPage = 1;
+        listView.currentIndex = 0;
+        listView.positionViewAtBeginning();
+    }
+
+    function goToLastPage(){
+        currentPage = totalPages;
+        listView.currentIndex = totalPages - 1;
+        listView.positionViewAtEnd();
+    }
+
     Keys.onPressed: (event) => {
         let scrollStep = 60;
         if(event.key === Qt.Key_Up){
@@ -100,15 +112,11 @@ Rectangle {
             event.accepted = true;
         }
         else if(event.key === Qt.Key_Home){
-            currentPage = 1;
-            listView.currentIndex = 0;
-            listView.positionViewAtBeginning();
+            goToFirstPage();
             event.accepted = true;
         }
         else if(event.key === Qt.Key_End){
-            currentPage = totalPages;
-            listView.currentIndex = totalPages - 1;
-            listView.positionViewAtEnd();
+            goToLastPage();
             event.accepted = true;
         }
     }

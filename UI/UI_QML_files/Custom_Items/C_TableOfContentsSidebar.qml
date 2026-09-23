@@ -105,6 +105,16 @@ Rectangle {
             leftPadding: 32
             rightPadding: 30
             verticalAlignment: TextInput.AlignVCenter
+            Keys.onPressed: (event) => {
+                if(event.key === Qt.Key_Home){
+                    tocSidebar.reader.goToFirstPage();
+                    event.accepted = true;
+                }
+                else if(event.key === Qt.Key_End){
+                    tocSidebar.reader.goToLastPage();
+                    event.accepted = true;
+                }
+            }
 
             Text {
                 text: "🔍"
