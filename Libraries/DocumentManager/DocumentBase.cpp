@@ -7,11 +7,11 @@ DocumentBase::DocumentBase(QObject* parent)
 
 DocumentBase::~DocumentBase() = default;
 
-int DocumentBase::GetTotalPageNumber() const{
+int DocumentBase::getTotalPageNumber() const{
     return m_totalPageNumber;
 }
 
-QString DocumentBase::GetTitle() const{
+QString DocumentBase::getTitle() const{
     return m_title;
 }
 
@@ -38,15 +38,3 @@ QVariant DocumentBase::data(const QModelIndex &index, int role) const {
     return QVariant();
 }
 
-QVariantMap DocumentBase::toVariantMap(const TocItem& item) const {
-    QVariantList childList;
-    for (const auto& child : item.children) {
-        childList.append(toVariantMap(child));
-    }
-    return QVariantMap{
-        {"title", item.title},
-        {"pageNum", item.pageNum},
-        {"hasChildren", item.hasChildren},
-        {"children", childList}
-    };
-}

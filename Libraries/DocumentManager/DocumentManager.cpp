@@ -43,9 +43,12 @@ void DocumentManager::openDocument(const QUrl& filePath) {
        m_activeDocument = std::make_unique<EpubDocument>();
     } */
 
-   m_activeDocument->getDocumentMetaData(filePath);
-
-    emit activeDocumentChanged();
+   if(m_activeDocument->getDocumentMetaData(filePath) == true){
+        emit activeDocumentChanged();
+   }else{
+       const QString errorMessage = "Failed to open " + QFileInfo(filePath.toLocalFile()).completeBaseName();
+       emit errorOccurred(errorMessage);
+   }
 }
 
 void DocumentManager::releaseDocument(){

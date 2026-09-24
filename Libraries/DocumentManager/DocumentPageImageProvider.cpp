@@ -1,11 +1,11 @@
-#include "Libraries/DocumentManager/DocumentImageProvider.h"
+#include "Libraries/DocumentManager/DocumentPageImageProvider.h"
 
-DocumentImageProvider::DocumentImageProvider(DocumentManager* docManager)
+DocumentPageImageProvider::DocumentPageImageProvider(DocumentManager* docManager)
     : QQuickImageProvider(QQuickImageProvider::Image), m_documentManager(docManager) {
 
 }
 
-QImage DocumentImageProvider::requestImage(const QString &id, QSize *size, const QSize &requestedSize) {
+QImage DocumentPageImageProvider::requestImage(const QString &id, QSize *size, const QSize &requestedSize) {
     if (m_documentManager == nullptr || m_documentManager->activeDocument() == nullptr) {
         return QImage();
     }
@@ -16,9 +16,7 @@ QImage DocumentImageProvider::requestImage(const QString &id, QSize *size, const
     }
 
     int pageNum = parts[1].toInt();
-    QSize target = requestedSize.isValid() ? requestedSize : QSize(1024, 1414);
-
-    QImage pageImage = m_documentManager->activeDocument()->renderPageImage(pageNum, target);
+    QImage pageImage = m_documentManager->activeDocument()->getPageImageData(pageNum);
 
     if (size) {
         *size = pageImage.size();

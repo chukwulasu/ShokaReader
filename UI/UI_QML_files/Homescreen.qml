@@ -3,6 +3,7 @@ import QtQuick.Layouts
 
 Rectangle {
     id: homeScreen
+    objectName: "homeScreen"
     color: "#16261B"
 
     Item {

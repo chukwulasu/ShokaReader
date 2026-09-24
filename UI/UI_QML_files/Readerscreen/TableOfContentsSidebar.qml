@@ -8,6 +8,11 @@ Rectangle {
     property var reader: null
     width: 300
     height: parent.height
+    anchors{
+        left: parent.left
+        top: parent.top
+        bottom: parent.bottom
+    }
     color: "#f8f9fa"
     border.color: "#dee2e6"
     border.width: 1

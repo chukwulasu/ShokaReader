@@ -10,7 +10,7 @@ Item {
 
     TextField {
         id: pageTextField
-        anchors.fill:parent
+        anchors.fill: parent
         padding: 0
         leftPadding: 0
         rightPadding: 0

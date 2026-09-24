@@ -1,0 +1,3 @@
+1. All files stored here are items that are reused in any QML file inside the Appwindow folder
+2. All items created in the Appwindow_Custom_Items folder are to start with C_ to easily make it easy to identify
+   in the other QML files that such item is a custom item and not a part of the conventional QML items

@@ -7,29 +7,27 @@ PdfDocument::PdfDocument(QObject* parent)
 
 PdfDocument::~PdfDocument() = default;
 
-void PdfDocument::getDocumentMetaData(const QUrl& filePath) {
+bool PdfDocument::getDocumentMetaData(const QUrl& filePath) {
     m_fileUrl = filePath;
     QString localPath = filePath.toLocalFile();
 
     m_pdfDocument = Poppler::Document::load(localPath);
     // TODO: write code to provide dialog to unlokck locked pdf files
     if (m_pdfDocument == nullptr || m_pdfDocument->isLocked() == true) {
-        qWarning() << "[PdfDocument] Failed to load PDF file with Poppler:" << localPath;
         m_totalPageNumber = 0;
         m_title.clear();
         m_pdfDocument.reset();
+        return false;
     } else {     
         m_totalPageNumber = m_pdfDocument->numPages();
         m_title = QFileInfo(localPath).completeBaseName();
-        qDebug() << "[PdfDocument] Successfully loaded PDF with Poppler. Total pages:" << m_totalPageNumber;
         // Notify QML that the table of contents data is now available
         emit tableOfContentsChanged();
     }
+    return true;
 }
 
-QImage PdfDocument::renderPageImage(int pageIndex, const QSize& targetSize) {
-    Q_UNUSED(targetSize);
-
+QImage PdfDocument::getPageImageData(int pageIndex) {
     if (m_pdfDocument == nullptr || pageIndex < 0 || pageIndex >= m_totalPageNumber) {
         return QImage();
     }
@@ -39,20 +37,9 @@ QImage PdfDocument::renderPageImage(int pageIndex, const QSize& targetSize) {
         return QImage();
     }
 
-    constexpr double renderDpi = 180.0; //180 DPI gave the best result so don't change it
+    constexpr double renderDpi = 180.0; // 180 DPI gave the best result so don't change it
 
     return pdfPage->renderToImage(renderDpi, renderDpi);
-}
-
-QSizeF PdfDocument::getPageSizePoints(int pageIndex) {
-    if (m_pdfDocument == nullptr || pageIndex < 0 || pageIndex >= m_totalPageNumber) {
-        return QSizeF(0, 0);
-    }
-    std::unique_ptr<Poppler::Page> pdfPage(m_pdfDocument->page(pageIndex));
-    if (pdfPage == nullptr) {
-        return QSizeF(0, 0);
-    }
-    return pdfPage->pageSizeF();
 }
 
 QVariantList PdfDocument::getPageTextRects(int pageIndex) {
@@ -66,14 +53,16 @@ QVariantList PdfDocument::getPageTextRects(int pageIndex) {
         return rectsList;
     }
 
-    std::vector<std::unique_ptr<Poppler::TextBox>> textList = pdfPage->textList();
-    for (const auto& box : textList) {
-        if (!box) continue;
+    std::vector<std::unique_ptr<Poppler::TextBox>> textBoxList = pdfPage->textList();
+    for (const auto& textRect : textBoxList) {
+        if (textRect == nullptr){
+            continue;
+        }
 
         QVariantMap wordMap;
-        wordMap["text"] = box->text();
+        wordMap["text"] = textRect->text();
 
-        QRectF rect = box->boundingBox();
+        QRectF rect = textRect->boundingBox();
         wordMap["x"] = rect.x();
         wordMap["y"] = rect.y();
         wordMap["width"] = rect.width();
@@ -85,43 +74,64 @@ QVariantList PdfDocument::getPageTextRects(int pageIndex) {
     return rectsList;
 }
 
-// Recursive helper function to parse Poppler's TOC tree
+QSizeF PdfDocument::getPageSizePoints(int pageIndex) {
+    if (m_pdfDocument == nullptr || pageIndex < 0 || pageIndex >= m_totalPageNumber) {
+        return QSizeF(0, 0);
+    }
+    std::unique_ptr<Poppler::Page> pdfPage(m_pdfDocument->page(pageIndex));
+    if (pdfPage == nullptr) {
+        return QSizeF(0, 0);
+    }
+    return pdfPage->pageSizeF();
+}
+
+QVariantMap PdfDocument::toVariantMap(const TocItem& item) const {
+    QVariantList childList;
+    for (const auto& child : item.TocItemChildren) {
+        childList.append(toVariantMap(child));
+    }
+    return QVariantMap{
+        {"title", item.title},
+        {"pageNum", item.pageNum},
+        {"hasChildren", item.hasChildren},
+        {"children", childList}
+    };
+}
+
 DocumentBase::TocItem PdfDocument::parsePopplerToc(const Poppler::OutlineItem* item, Poppler::Document* pdfDoc) {
     DocumentBase::TocItem tocNode;
-    if (!item) return tocNode;
+    if (item == nullptr){
+         return tocNode;
+    }
 
     tocNode.title = item->name();
 
-    // Resolve destination directly
-    if (item->destination()) {
-        auto dest = item->destination();
+    if (item->destination() != nullptr) {
+        QSharedPointer<const Poppler::LinkDestination> dest = item->destination();
         tocNode.pageNum = dest->pageNumber();
     }
 
-    // Process nested subsections - note it returns a QList<Poppler::OutlineItem> by value
-    const QList<Poppler::OutlineItem> children = item->children();
-    tocNode.hasChildren = !children.isEmpty();
+    const QVector<Poppler::OutlineItem> tocNodeChildren = item->children();
+    tocNode.hasChildren = !tocNodeChildren.isEmpty();
 
-    // Loop through them using a const reference to avoid pointer mismatches
-    for (const auto& child : children) {
-        tocNode.children.append(parsePopplerToc(&child, pdfDoc));
+    for (const auto& child : tocNodeChildren) {
+        tocNode.TocItemChildren.append(parsePopplerToc(&child, pdfDoc));
     }
 
     return tocNode;
 }
 
 QVariantList PdfDocument::getTableOfContents() {
-    if (!m_pdfDocument) return QVariantList();
+    if (!m_pdfDocument){
+        return QVariantList();
+    }
 
     QVector<Poppler::OutlineItem> outlineItems = m_pdfDocument->outline();
-    qDebug() << "[PdfDocument] Raw outline items found by Poppler:" << outlineItems.size();
-
     QVariantList rootList;
+
     for (const auto& item : std::as_const(outlineItems)) {
         DocumentBase::TocItem node = parsePopplerToc(&item, m_pdfDocument.get());
         rootList.append(toVariantMap(node));
     }
-
-    qDebug() << "[PdfDocument] Total root TOC items serialized:" << rootList.size();
     return rootList;
 }
