@@ -27,11 +27,17 @@ Rectangle {
 
             // Helper to check if this node or any of its infinite descendants match the search query
             function hasMatch(node, q) {
-                if (!q) return true;
-                if (node.title && node.title.toLowerCase().includes(q)) return true;
-                if (node.children) {
-                    for (let c = 0; c < node.children.length; ++c) {
-                        if (hasMatch(node.children[c], q)) return true;
+                if (!q){
+                    return true;
+                } 
+                if (node.title && node.title.toLowerCase().includes(q)) {
+                    return true;
+                }
+                if (node.TocItemChildren) {
+                    for (let c = 0; c < node.TocItemChildren.length; ++c) {
+                        if (hasMatch(node.TocItemChildren[c], q)){
+                            return true;
+                        } 
                     }
                 }
                 return false;
@@ -39,7 +45,7 @@ Rectangle {
 
             if (!hasMatch(item, lowerQuery)) continue;
 
-            let hasKids = item.children && item.children.length > 0;
+            let hasKids = item.TocItemChildren && item.TocItemChildren.length > 0;
             // Auto-expand all matching branches when searching, otherwise respect user toggle
             let isExpanded = lowerQuery.length > 0 ? true : (expansionState[currentPath] === true);
 
@@ -55,7 +61,7 @@ Rectangle {
 
             // If expanded and has children, recursively flatten and append them
             if (hasKids && isExpanded) {
-                let childItems = getFlattenedToc(item.children, query, currentPath);
+                let childItems = getFlattenedToc(item.TocItemChildren, query, currentPath);
                 for (let j = 0; j < childItems.length; ++j) {
                     result.push(childItems[j]);
                 }

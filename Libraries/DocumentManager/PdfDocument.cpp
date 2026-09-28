@@ -42,17 +42,16 @@ QImage PdfDocument::getPageImageData(int pageIndex) {
     return pdfPage->renderToImage(renderDpi, renderDpi);
 }
 
-QVariantList PdfDocument::getTableOfContents() {
+QVector<TocItem> PdfDocument::getTableOfContents() {
     if (m_pdfDocument == nullptr){
-        return QVariantList();
+        return QVector<TocItem>();
     }
 
     QVector<Poppler::OutlineItem> outlineItems = m_pdfDocument->outline();
-    QVariantList rootList;
+    QVector<TocItem> rootList;
 
     for (const auto& item : std::as_const(outlineItems)) {
-        DocumentBase::TocItem node = parsePopplerToc(&item, m_pdfDocument.get());
-        rootList.append(toVariantMap(node));
+        rootList.append(parsePopplerToc(&item, m_pdfDocument.get()));
     }
     return rootList;
 }
@@ -100,21 +99,8 @@ QSizeF PdfDocument::getPageSizePoints(int pageIndex) {
     return pdfPage->pageSizeF();
 }
 
-QVariantMap PdfDocument::toVariantMap(const TocItem& item) const {
-    QVariantList childList;
-    for (const auto& child : item.TocItemChildren) {
-        childList.append(toVariantMap(child));
-    }
-    return QVariantMap{
-        {"title", item.title},
-        {"pageNum", item.pageNum},
-        {"hasChildren", item.hasChildren},
-        {"children", childList}
-    };
-}
-
-DocumentBase::TocItem PdfDocument::parsePopplerToc(const Poppler::OutlineItem* item, Poppler::Document* pdfDoc) {
-    DocumentBase::TocItem tocNode;
+TocItem PdfDocument::parsePopplerToc(const Poppler::OutlineItem* item, Poppler::Document* pdfDoc) {
+    TocItem tocNode;
     if (item == nullptr){
          return tocNode;
     }
