@@ -7,6 +7,10 @@ DocumentBase::DocumentBase(QObject* parent)
 
 DocumentBase::~DocumentBase() = default;
 
+const QVector<TocItem>& DocumentBase::getTableOfContents() const{
+    return m_tableOfContents;
+}
+
 QUrl DocumentBase::getFileUrl() const{
     return m_fileUrl;
 }

@@ -135,7 +135,7 @@ ApplicationWindow {
                     }
 
                     C_ToolbarButton{
-                        id:rotateRigthButton
+                        id:rotateRightButton
                         source: "../../assets/images/RotateRight.png"
                         shortcut: "Ctrl + R"
                         toolTipText: "Rotate Right(Ctrl + R)"

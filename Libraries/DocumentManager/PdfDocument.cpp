@@ -17,12 +17,18 @@ bool PdfDocument::getDocumentMetaData(const QUrl& filePath) {
         m_totalPageNumber = 0;
         m_title.clear();
         m_pdfDocument.reset();
+        m_tableOfContents.clear();
         return false;
     } else {     
         m_totalPageNumber = m_pdfDocument->numPages();
         m_title = QFileInfo(localPath).completeBaseName();
-        // Notify QML that the table of contents data is now available
-        emit tableOfContentsChanged();
+       
+        // Parse and populate the cached TOC once
+        m_tableOfContents.clear();
+        const QVector<Poppler::OutlineItem> outlineItems = m_pdfDocument->outline();
+        for (const auto& item : std::as_const(outlineItems)) {
+            m_tableOfContents.append(parsePopplerToc(&item, m_pdfDocument.get()));
+        }
     }
     return true;
 }
@@ -40,20 +46,6 @@ QImage PdfDocument::getPageImageData(int pageIndex) {
     constexpr double renderDpi = 180.0; // 180 DPI gave the best result for performacne and resolution so don't change it
 
     return pdfPage->renderToImage(renderDpi, renderDpi);
-}
-
-QVector<TocItem> PdfDocument::getTableOfContents() {
-    if (m_pdfDocument == nullptr){
-        return QVector<TocItem>();
-    }
-
-    QVector<Poppler::OutlineItem> outlineItems = m_pdfDocument->outline();
-    QVector<TocItem> rootList;
-
-    for (const auto& item : std::as_const(outlineItems)) {
-        rootList.append(parsePopplerToc(&item, m_pdfDocument.get()));
-    }
-    return rootList;
 }
 
 QVariantList PdfDocument::getPageTextRects(int pageIndex) {

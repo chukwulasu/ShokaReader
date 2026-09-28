@@ -12,8 +12,7 @@ public:
     ~PdfDocument() override;
     bool getDocumentMetaData(const QUrl& filePath) override;
     QImage getPageImageData(int pageIndex) override;
-    QVector<TocItem> getTableOfContents() override;
-
+    
     /*
     Returns a QVariantList of QVariantMaps where each
     QVariantMap has keys that holds data on the rectangles
