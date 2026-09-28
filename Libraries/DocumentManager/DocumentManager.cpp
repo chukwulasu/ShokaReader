@@ -26,7 +26,9 @@ DocumentType DocumentManager::GetFileType(const QUrl& qmlFilePath) const {
 void DocumentManager::openDocument(const QUrl& filePath) {
     DocumentType fileType = GetFileType(filePath);
     if (fileType == DocumentType::Invalid) {
-        emit errorOccurred("The selected file is missing or unsupported.");
+        const QString errorMessage = QFileInfo(filePath.toLocalFile()).completeBaseName() +
+            "is missing or an invalid file";
+        emit errorOccurred(errorMessage);
         return;
     }
 
@@ -43,9 +45,12 @@ void DocumentManager::openDocument(const QUrl& filePath) {
        m_activeDocument = std::make_unique<EpubDocument>();
     } */
 
-   m_activeDocument->getDocumentMetaData(filePath);
-
-    emit activeDocumentChanged();
+   if(m_activeDocument->getDocumentMetaData(filePath) == true){
+        emit activeDocumentChanged();
+   }else{
+       const QString errorMessage = "Failed to open " + QFileInfo(filePath.toLocalFile()).completeBaseName();
+       emit errorOccurred(errorMessage);
+   }
 }
 
 void DocumentManager::releaseDocument(){

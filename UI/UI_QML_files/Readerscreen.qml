@@ -48,8 +48,8 @@ Rectangle {
     }
 
     function jumpToPage(pageNum) {
-        currentPage = pageNum;
-        if (currentPage > 0 && currentPage <= totalPages) {
+        if (pageNum > 0 && pageNum <= totalPages) {
+            currentPage = pageNum;
             listView.currentIndex = currentPage - 1;
             listView.positionViewAtIndex(listView.currentIndex, ListView.Beginning);
         }

@@ -3,6 +3,11 @@ cmake_minimum_required(VERSION 3.16)
 project(ShokaReader VERSION 0.1 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+if(WIN32)
+    set(RESOURCE_FILES "${CMAKE_CURRENT_SOURCE_DIR}/UI/assets/ApplicationIcon/app.rc")
+else()
+    set(RESOURCE_FILES "")
+endif()
 
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(PopplerQt6 REQUIRED IMPORTED_TARGET poppler-qt6)
@@ -23,9 +28,10 @@ qt_add_executable(ShokaReader
     ./Libraries/DocumentManager/PdfDocument.cpp
     ./Libraries/DocumentManager/DocumentManager.h
     ./Libraries/DocumentManager/DocumentManager.cpp
-    ./Libraries/DocumentManager/DocumentImageProvider.h
-    ./Libraries/DocumentManager/DocumentImageProvider.cpp
-)
+    ./Libraries/DocumentManager/DocumentPageImageProvider.h
+    ./Libraries/DocumentManager/DocumentPageImageProvider.cpp
+    ${RESOURCE_FILES}
+    )
 
 qt_add_qml_module(ShokaReader
     URI ShokaReader
@@ -33,8 +39,8 @@ qt_add_qml_module(ShokaReader
         UI/UI_QML_files/Appwindow.qml
         UI/UI_QML_files/Homescreen.qml
         UI/UI_QML_files/Readerscreen.qml
+        UI/UI_QML_files/Custom_Items/C_PageNumberViewer.qml
         UI/UI_QML_files/Custom_Items/C_ToolbarButton.qml
-        UI/UI_QML_files/Custom_Items/C_PageViewer.qml
         UI/UI_QML_files/Custom_Items/C_TableOfContentsSidebar.qml
     RESOURCES
     UI/assets/images/AppIcon.png

@@ -156,7 +156,7 @@ ApplicationWindow {
                         Layout.fillHeight: true
                     }
 
-                    C_PageViewer {
+                    C_PageNumberViewer {
                         id: pageViewer
                         Layout.preferredWidth: 47
                         Layout.preferredHeight: 24

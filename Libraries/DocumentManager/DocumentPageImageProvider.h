@@ -3,10 +3,10 @@
 #include <QQuickImageProvider>
 #include "Libraries/DocumentManager/DocumentManager.h"
 
-class DocumentImageProvider : public QQuickImageProvider {
+class DocumentPageImageProvider : public QQuickImageProvider {
 public:
-    explicit DocumentImageProvider(DocumentManager* docManager);
-    ~DocumentImageProvider() override = default;
+    explicit DocumentPageImageProvider(DocumentManager* docManager);
+    ~DocumentPageImageProvider() override = default;
     QImage requestImage(const QString &id, QSize *size, const QSize &requestedSize) override;
 
 private:
