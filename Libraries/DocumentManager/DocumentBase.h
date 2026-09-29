@@ -45,7 +45,7 @@ public:
     virtual ~DocumentBase();
     virtual bool getDocumentMetaData(const QUrl &filePath) = 0;
     virtual QImage getPageImageData(int pageIndex) = 0;
-    const QVector<TocItem>& getTableOfContents() const;
+    virtual const QVector<TocItem>& getTableOfContents();
     Q_INVOKABLE virtual QVariantList getPageTextRects(int pageIndex) = 0;
     Q_INVOKABLE virtual QSizeF getPageSizePoints(int pageIndex) = 0;
     QUrl getFileUrl() const;

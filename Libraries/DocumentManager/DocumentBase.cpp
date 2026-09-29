@@ -7,7 +7,7 @@ DocumentBase::DocumentBase(QObject* parent)
 
 DocumentBase::~DocumentBase() = default;
 
-const QVector<TocItem>& DocumentBase::getTableOfContents() const{
+const QVector<TocItem>& DocumentBase::getTableOfContents(){
     return m_tableOfContents;
 }
 

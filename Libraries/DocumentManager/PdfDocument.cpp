@@ -22,13 +22,7 @@ bool PdfDocument::getDocumentMetaData(const QUrl& filePath) {
     } else {     
         m_totalPageNumber = m_pdfDocument->numPages();
         m_title = QFileInfo(localPath).completeBaseName();
-       
-        // Parse and populate the cached TOC once
         m_tableOfContents.clear();
-        const QVector<Poppler::OutlineItem> outlineItems = m_pdfDocument->outline();
-        for (const auto& item : std::as_const(outlineItems)) {
-            m_tableOfContents.append(parsePopplerToc(&item, m_pdfDocument.get()));
-        }
     }
     return true;
 }
@@ -91,25 +85,35 @@ QSizeF PdfDocument::getPageSizePoints(int pageIndex) {
     return pdfPage->pageSizeF();
 }
 
-TocItem PdfDocument::parsePopplerToc(const Poppler::OutlineItem* item, Poppler::Document* pdfDoc) {
-    TocItem tocNode;
-    if (item == nullptr){
-         return tocNode;
+const QVector<TocItem>& PdfDocument::getTableOfContents() {
+    if (m_tableOfContents.isEmpty() == true  && m_pdfDocument != nullptr) {
+        parsePopplerToc(m_pdfDocument->outline(), m_tableOfContents);
+    }
+    return m_tableOfContents;
+}
+
+void PdfDocument::parsePopplerToc(const QVector<Poppler::OutlineItem>& items, QVector<TocItem>& tocVector) {
+    if (items.isEmpty()) {
+        return;
     }
 
-    tocNode.title = item->name();
+    tocVector.reserve(items.size());
 
-    if (item->destination() != nullptr) {
-        QSharedPointer<const Poppler::LinkDestination> dest = item->destination();
-        tocNode.pageNum = dest->pageNumber();
+    for (const auto& item : items) {
+        TocItem tocNode;
+        tocNode.title = item.name();
+
+        if (auto dest = item.destination()) {
+            tocNode.pageNum = dest->pageNumber();
+        }
+
+        const QVector<Poppler::OutlineItem> tocNodeChildren = item.children();
+        tocNode.hasChildren = !tocNodeChildren.isEmpty();
+
+        if (tocNode.hasChildren) {
+            parsePopplerToc(tocNodeChildren, tocNode.TocItemChildren);
+        }
+
+        tocVector.append(std::move(tocNode));
     }
-
-    const QVector<Poppler::OutlineItem> tocNodeChildren = item->children();
-    tocNode.hasChildren = !tocNodeChildren.isEmpty();
-
-    for (const auto& child : tocNodeChildren) {
-        tocNode.TocItemChildren.append(parsePopplerToc(&child, pdfDoc));
-    }
-
-    return tocNode;
 }

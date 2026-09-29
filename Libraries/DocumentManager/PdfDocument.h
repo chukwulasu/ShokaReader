@@ -12,6 +12,7 @@ public:
     ~PdfDocument() override;
     bool getDocumentMetaData(const QUrl& filePath) override;
     QImage getPageImageData(int pageIndex) override;
+    const QVector<TocItem>& getTableOfContents() override;
     
     /*
     Returns a QVariantList of QVariantMaps where each
@@ -27,7 +28,7 @@ public:
 
 private:
     // Recursive helper functions to parse Poppler's TOC tree
-    TocItem parsePopplerToc(const Poppler::OutlineItem* item, Poppler::Document* pdfDoc);
+    void parsePopplerToc(const QVector<Poppler::OutlineItem>& items, QVector<TocItem>& tocVector);
 
 private:
     std::unique_ptr<Poppler::Document> m_pdfDocument = nullptr;
