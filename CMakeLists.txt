@@ -45,6 +45,7 @@ qt_add_qml_module(ShokaReader
     RESOURCES
     UI/assets/images/AppIcon.png
     UI/assets/images/Homescreen.png
+    UI/assets/images/Homescreen_for_phones.png
     UI/assets/images/HomeIcon.png
     UI/assets/images/LastRead.png
     UI/assets/images/Files.png

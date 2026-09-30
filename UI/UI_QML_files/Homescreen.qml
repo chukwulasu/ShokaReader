@@ -1,18 +1,14 @@
 import QtQuick
 import QtQuick.Layouts
 
-Rectangle {
+Item {
     id: homeScreen
-    color: "#16261B"
+    anchors.fill: parent
 
-    Item {
+    Image {
         anchors.fill: parent
-
-        Image {
-            anchors.fill: parent
-            source: "../assets/images/Homescreen.png"
-            fillMode: Image.Stretch
-            cache: true
-        }
+        source: "../assets/images/Homescreen.png"
+        fillMode: Image.PreserveAspectCrop
+        cache: true
     }
 }
