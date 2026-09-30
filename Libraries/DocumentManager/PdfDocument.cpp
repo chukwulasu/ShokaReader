@@ -87,13 +87,15 @@ QSizeF PdfDocument::getPageSizePoints(int pageIndex) {
 
 const QVector<TocItem>& PdfDocument::getTableOfContents() {
     if (m_tableOfContents.isEmpty() == true  && m_pdfDocument != nullptr) {
-        parsePopplerToc(m_pdfDocument->outline(), m_tableOfContents);
+        parsePopplerToc(m_pdfDocument->outline(), m_tableOfContents,0);
     }
     return m_tableOfContents;
 }
 
-void PdfDocument::parsePopplerToc(const QVector<Poppler::OutlineItem>& items, QVector<TocItem>& tocVector) {
-    if (items.isEmpty()) {
+void PdfDocument::parsePopplerToc(const QVector<Poppler::OutlineItem>& items, QVector<TocItem>& tocVector, int currentDepth) {
+    constexpr int MAX_TOC_DEPTH = 4;
+
+    if (items.isEmpty() == true || currentDepth >= MAX_TOC_DEPTH) {
         return;
     }
 
@@ -108,10 +110,10 @@ void PdfDocument::parsePopplerToc(const QVector<Poppler::OutlineItem>& items, QV
         }
 
         const QVector<Poppler::OutlineItem> tocNodeChildren = item.children();
-        tocNode.hasChildren = !tocNodeChildren.isEmpty();
+        tocNode.hasChildren = (tocNodeChildren.isEmpty() == false) && ((currentDepth + 1) < MAX_TOC_DEPTH);
 
-        if (tocNode.hasChildren) {
-            parsePopplerToc(tocNodeChildren, tocNode.TocItemChildren);
+        if (tocNode.hasChildren == true) {
+            parsePopplerToc(tocNodeChildren, tocNode.TocItemChildren, currentDepth + 1);
         }
 
         tocVector.append(std::move(tocNode));

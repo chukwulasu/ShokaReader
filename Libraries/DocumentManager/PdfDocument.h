@@ -28,7 +28,7 @@ public:
 
 private:
     // Recursive helper functions to parse Poppler's TOC tree
-    void parsePopplerToc(const QVector<Poppler::OutlineItem>& items, QVector<TocItem>& tocVector);
+    void parsePopplerToc(const QVector<Poppler::OutlineItem>& items, QVector<TocItem>& tocVector, int currentDepth = 0);
 
 private:
     std::unique_ptr<Poppler::Document> m_pdfDocument = nullptr;
