@@ -6,7 +6,7 @@ DocumentManager::DocumentManager(QObject* parent)
 
 }
 
-DocumentType DocumentManager::GetFileType(const QUrl& qmlFilePath) const {
+DocumentType DocumentManager::getFileType(const QUrl& qmlFilePath) const {
     QFileInfo qtFilePath(qmlFilePath.toLocalFile());
 
     if (!qtFilePath.isFile()) {
@@ -24,7 +24,7 @@ DocumentType DocumentManager::GetFileType(const QUrl& qmlFilePath) const {
 }
 
 void DocumentManager::openDocument(const QUrl& filePath) {
-    DocumentType fileType = GetFileType(filePath);
+    DocumentType fileType = getFileType(filePath);
     if (fileType == DocumentType::Invalid) {
         const QString errorMessage = QFileInfo(filePath.toLocalFile()).completeBaseName() +
             "is missing or an invalid file";
@@ -54,10 +54,11 @@ void DocumentManager::openDocument(const QUrl& filePath) {
 }
 
 void DocumentManager::releaseDocument(){
-    if(m_activeDocument != nullptr)
+    if(m_activeDocument != nullptr){
         m_activeDocument = nullptr;
+    }
 }
 
-DocumentBase* DocumentManager::activeDocument() const {
+DocumentBase* DocumentManager::getActiveDocument() const {
     return m_activeDocument.get();
 }

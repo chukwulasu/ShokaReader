@@ -5,8 +5,10 @@ DocumentPageImageProvider::DocumentPageImageProvider(DocumentManager* docManager
 
 }
 
+DocumentPageImageProvider::~DocumentPageImageProvider() = default;
+
 QImage DocumentPageImageProvider::requestImage(const QString &id, QSize *size, const QSize &requestedSize) {
-    if (m_documentManager == nullptr || m_documentManager->activeDocument() == nullptr) {
+    if (m_documentManager == nullptr || m_documentManager->getActiveDocument() == nullptr) {
         return QImage();
     }
 
@@ -16,9 +18,9 @@ QImage DocumentPageImageProvider::requestImage(const QString &id, QSize *size, c
     }
 
     int pageNum = parts[1].toInt();
-    QImage pageImage = m_documentManager->activeDocument()->getPageImageData(pageNum);
+    QImage pageImage = m_documentManager->getActiveDocument()->getPageImageData(pageNum);
 
-    if (size) {
+    if (size != nullptr) {
         *size = pageImage.size();
     }
 

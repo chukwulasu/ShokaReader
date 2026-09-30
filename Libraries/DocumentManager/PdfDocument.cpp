@@ -42,8 +42,8 @@ QImage PdfDocument::getPageImageData(int pageIndex) {
     return pdfPage->renderToImage(renderDpi, renderDpi);
 }
 
-QVariantList PdfDocument::getPageTextRects(int pageIndex) {
-    QVariantList rectsList;
+QList<TextRectItem> PdfDocument::getPageTextRects(int pageIndex) {
+    QList<TextRectItem> rectsList;
     if (m_pdfDocument == nullptr || pageIndex < 0 || pageIndex >= m_totalPageNumber) {
         return rectsList;
     }
@@ -54,21 +54,23 @@ QVariantList PdfDocument::getPageTextRects(int pageIndex) {
     }
 
     std::vector<std::unique_ptr<Poppler::TextBox>> textBoxList = pdfPage->textList();
+    rectsList.reserve(static_cast<qsizetype>(textBoxList.size()));
+
     for (const auto& textRect : textBoxList) {
-        if (textRect == nullptr){
+        if (textRect == nullptr) {
             continue;
         }
 
-        QVariantMap wordMap;
-        wordMap["text"] = textRect->text();
+        TextRectItem wordItem;
+        wordItem.text = textRect->text();
 
         QRectF rect = textRect->boundingBox();
-        wordMap["x"] = rect.x();
-        wordMap["y"] = rect.y();
-        wordMap["width"] = rect.width();
-        wordMap["height"] = rect.height();
+        wordItem.x = rect.x();
+        wordItem.y = rect.y();
+        wordItem.width = rect.width();
+        wordItem.height = rect.height();
 
-        rectsList.append(wordMap);
+        rectsList.append(std::move(wordItem));
     }
 
     return rectsList;

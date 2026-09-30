@@ -13,13 +13,12 @@ public:
     bool getDocumentMetaData(const QUrl& filePath) override;
     QImage getPageImageData(int pageIndex) override;
     const QVector<TocItem>& getTableOfContents() override;
-    
+   
     /*
-    Returns a QVariantList of QVariantMaps where each
-    QVariantMap has keys that holds data on the rectangles
-    surrounding each word on a page
+    Returns a contiguous QList of TextRectItem structs holding
+    the text string and bounding box in PDF points for each word.
     */
-    Q_INVOKABLE QVariantList getPageTextRects(int pageIndex) override;
+    Q_INVOKABLE QList<TextRectItem> getPageTextRects(int pageIndex) override;
 
     /*
     Returns the dimensions of page at pageIndex in points(i.e 1/72 th of an inch)

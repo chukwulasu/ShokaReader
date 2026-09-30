@@ -6,7 +6,7 @@
 class DocumentPageImageProvider : public QQuickImageProvider {
 public:
     explicit DocumentPageImageProvider(DocumentManager* docManager);
-    ~DocumentPageImageProvider() override = default;
+    ~DocumentPageImageProvider() override;
     QImage requestImage(const QString &id, QSize *size, const QSize &requestedSize) override;
 
 private:

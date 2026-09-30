@@ -15,15 +15,15 @@ enum class DocumentType {
 
 class DocumentManager : public QObject {
     Q_OBJECT
-    Q_PROPERTY(DocumentBase* activeDocument READ activeDocument NOTIFY activeDocumentChanged)
+    Q_PROPERTY(DocumentBase* activeDocument READ getActiveDocument NOTIFY activeDocumentChanged)
 
 public:
     explicit DocumentManager(QObject* parent = nullptr);
     ~DocumentManager() override = default;
     Q_INVOKABLE void openDocument(const QUrl& filePath);
     Q_INVOKABLE void releaseDocument();
-    DocumentBase* activeDocument() const;
-    DocumentType GetFileType(const QUrl& qmlFilePath) const;
+    DocumentBase* getActiveDocument() const;
+    DocumentType getFileType(const QUrl& qmlFilePath) const;
 
 signals:
     void activeDocumentChanged();

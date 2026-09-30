@@ -7,7 +7,7 @@
 #include <QSizeF>
 #include <QAbstractListModel>
 #include <QVector>
-#include <QVariantList>
+#include <QList>
 #include <QMetaType>
 
 struct TocItem {
@@ -33,6 +33,33 @@ public:
 
 Q_DECLARE_METATYPE(TocItem)
 
+struct TextRectItem {
+    Q_GADGET
+
+    Q_PROPERTY(QString text MEMBER text CONSTANT)
+    Q_PROPERTY(qreal x MEMBER x CONSTANT)
+    Q_PROPERTY(qreal y MEMBER y CONSTANT)
+    Q_PROPERTY(qreal width MEMBER width CONSTANT)
+    Q_PROPERTY(qreal height MEMBER height CONSTANT)
+
+public:
+    QString text;
+    qreal x = 0.0;
+    qreal y = 0.0;
+    qreal width = 0.0;
+    qreal height = 0.0;
+
+    bool operator==(const TextRectItem& other) const {
+        return text == other.text &&
+               x == other.x &&
+               y == other.y &&
+               width == other.width &&
+               height == other.height;
+    }
+};
+
+Q_DECLARE_METATYPE(TextRectItem)
+
 class DocumentBase : public QAbstractListModel{
     Q_OBJECT
     Q_PROPERTY(QUrl fileUrl READ getFileUrl CONSTANT)
@@ -46,7 +73,7 @@ public:
     virtual bool getDocumentMetaData(const QUrl &filePath) = 0;
     virtual QImage getPageImageData(int pageIndex) = 0;
     virtual const QVector<TocItem>& getTableOfContents();
-    Q_INVOKABLE virtual QVariantList getPageTextRects(int pageIndex) = 0;
+    Q_INVOKABLE virtual QList<TextRectItem> getPageTextRects(int pageIndex) = 0;
     Q_INVOKABLE virtual QSizeF getPageSizePoints(int pageIndex) = 0;
     QUrl getFileUrl() const;
     int getTotalPageNumber() const;
