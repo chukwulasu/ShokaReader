@@ -185,6 +185,7 @@ ApplicationWindow {
         title: "Select EPUB or PDF File"
         nameFilters: ["Documents (*.pdf *.epub)", "All Files (*.*)"]
         onAccepted: {
+            //TODO: remove console.log in final product
             console.log("Selected file: " + selectedFile);
             documentManager.openDocument(selectedFile);
         }
@@ -195,7 +196,7 @@ ApplicationWindow {
 
         function onActiveDocumentChanged() {
             if (documentManager.activeDocument === null) return;
-
+            //TODO: remove the console.log in final prduct
             console.log("[QML] Backend confirmed load success for: " + documentManager.activeDocument.fileUrl);
             stackView.replace("Readerscreen.qml",StackView.Immediate);
         }

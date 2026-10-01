@@ -470,6 +470,7 @@ Rectangle {
 
                                 if (collectedText.trim().length > 0) {
                                     pageContainer.extractedText = collectedText.trim();
+                                    //TODO: remove in final product
                                     console.log("[QML] Range Selection Success! Copied text: " + pageContainer.extractedText);
                                 }
                             }

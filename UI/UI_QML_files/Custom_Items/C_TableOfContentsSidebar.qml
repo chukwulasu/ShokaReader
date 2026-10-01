@@ -6,8 +6,8 @@ import QtQml.Models
 Rectangle {
     id: tocSidebar
     property var reader: null
-    width: 300
-    height: parent.height
+    implicitWidth: 300
+    implicitHeight: parent.height
     color: "#f8f9fa"
     border.color: "#dee2e6"
     border.width: 1

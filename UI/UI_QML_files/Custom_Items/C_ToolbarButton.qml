@@ -1,5 +1,4 @@
 import QtQuick
-import QtQuick.Layouts
 import QtQuick.Controls
 
 Item {
@@ -10,8 +9,8 @@ Item {
 
     signal clicked()
 
-    Layout.preferredWidth: 40
-    Layout.preferredHeight: 40
+    implicitWidth: 40
+    implicitHeight: 40
 
     Image {
         id: iconImage
