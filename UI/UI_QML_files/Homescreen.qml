@@ -1,14 +1,8 @@
 import QtQuick
-import QtQuick.Layouts
 
-Item {
+Image {
     id: homeScreen
-    anchors.fill: parent
-
-    Image {
-        anchors.fill: parent
-        source: "../assets/images/Homescreen.png"
-        fillMode: Image.PreserveAspectCrop
-        cache: true
-    }
+    source: "../assets/images/Homescreen.png"
+    fillMode: Image.PreserveAspectCrop
+    cache: true
 }
