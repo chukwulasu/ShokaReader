@@ -21,6 +21,11 @@ Rectangle {
         forceActiveFocus();
     }
 
+    //TODO: remove later after you are done with the product, to be used to test lifecycle of stackview items
+    Component.onDestruction: {
+        console.log("[Lifecycle] Readerscreen has been destroyed and freed from memory.");
+    }
+
     function zoomIn() {
         if (currentZoom < 6.0)
             currentZoom += 0.2;

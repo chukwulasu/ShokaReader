@@ -17,8 +17,7 @@ ApplicationWindow {
 
     Component.onCompleted: {
             if (documentManager.activeDocument !== null) {
-                stackView.clear();
-                stackView.push("Readerscreen.qml");
+                stackView.replace("Readerscreen.qml",StackView.Immediate);
             }
         }
 
@@ -42,9 +41,10 @@ ApplicationWindow {
                     source: "../../assets/images/HomeIcon.png"
                     toolTipText: "Home"
                     onClicked: {
-                        stackView.clear();
-                        stackView.push("Homescreen.qml");
-                        documentManager.releaseDocument();
+                        if(stackView.currentItem !== null && stackView.currentItem.objectName !== "homeScreen"){
+                            stackView.replace("Homescreen.qml",StackView.Immediate);
+                            documentManager.releaseDocument();
+                        }
                     }
                 }
 
@@ -197,8 +197,7 @@ ApplicationWindow {
             if (documentManager.activeDocument === null) return;
 
             console.log("[QML] Backend confirmed load success for: " + documentManager.activeDocument.fileUrl);
-            stackView.clear();
-            stackView.push("Readerscreen.qml");
+            stackView.replace("Readerscreen.qml",StackView.Immediate);
         }
 
         function onErrorOccurred(errorMessage) {
