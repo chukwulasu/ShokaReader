@@ -250,26 +250,23 @@ Rectangle {
                     property int selectionEndIndex: -1
                     property string extractedText: ""
 
-                    function mapMouseToPdf(mx, my) {
-                        let pw = pageContainer.width;
-                        let ph = pageContainer.height;
-                        let unrotatedX = mx;
-                        let unrotatedY = my;
+                    function mapMouseToPdf(scenePoint) {
+                        // Convert the pointer from scene coordinates into the
+                        // pageContainer's local coordinates. Qt performs the
+                        // rotation/position/transform conversion for us.
+                        let localPoint = pageContainer.mapFromItem(
+                            null,
+                            scenePoint.x,
+                            scenePoint.y
+                        );
 
-                        if (pageRotation === 90) {
-                            unrotatedX = my;
-                            unrotatedY = pw - mx;
-                        } else if (pageRotation === 180) {
-                            unrotatedX = pw - mx;
-                            unrotatedY = ph - my;
-                        } else if (pageRotation === 270) {
-                            unrotatedX = ph - my;
-                            unrotatedY = mx;
-                        }
+                        let scaleX = pageSizePoints.width / pageContainer.width;
+                        let scaleY = pageSizePoints.height / pageContainer.height;
 
-                        let scaleX = pageSizePoints.width / pw;
-                        let scaleY = pageSizePoints.height / ph;
-                        return Qt.point(unrotatedX * scaleX, unrotatedY * scaleY);
+                        return Qt.point(
+                            localPoint.x * scaleX,
+                            localPoint.y * scaleY
+                        );
                     }
 
                     // Rectangle-aware hit testing to prevent selection jumping
@@ -287,24 +284,9 @@ Rectangle {
                         }
 
                         // Second: nearest rectangle scoring
-                        let bestIndex = -1;
-                        let bestScore = Number.MAX_VALUE;
-
-                        for (let i = 0; i < textRects.length; ++i) {
-                            let box = textRects[i];
-
-                            let xDistance = pt.x < box.x ? box.x - pt.x : (pt.x > box.x + box.width ? pt.x - (box.x + box.width) : 0);
-                            let yDistance = pt.y < box.y ? box.y - pt.y : (pt.y > box.y + box.height ? pt.y - (box.y + box.height) : 0);
-
-                            let score = yDistance * 10 + xDistance;
-
-                            if (score < bestScore) {
-                                bestScore = score;
-                                bestIndex = i;
-                            }
-                        }
-
-                        return bestIndex;
+                        // Intentionally no longer used: whitespace must not
+                        // select an arbitrary word above or below the pointer.
+                        return -1;
                     }
 
                     function boxesAreOnSameLine(a, b) {
@@ -403,54 +385,104 @@ Rectangle {
                         }
                     }
 
-                    MouseArea {
-                        id: dragSelectionArea
-                        anchors.fill: parent
+                    // TapHandler is used for a plain click so an existing
+                    // selection can be cleared without requiring another drag.
+                    // Its default DragThreshold policy lets it cooperate with
+                    // the DragHandler below and cancel itself when a drag starts.
+                    TapHandler {
+                        id: clearSelectionHandler
                         acceptedButtons: Qt.LeftButton
-                        preventStealing: true
+                        gesturePolicy: TapHandler.DragThreshold
 
-                        onPressed: (mouse) => {
-                            if (textRects.length === 0) return;
-                            // Clear previous selection and start fresh on press for trackpad/mouse compatibility
-                            pageContainer.isSelecting = true;
-                            let pt = pageContainer.mapMouseToPdf(mouse.x, mouse.y);
-                            let idx = pageContainer.findNearestWordIndex(pt);
-                            pageContainer.selectionStartIndex = idx;
-                            pageContainer.selectionEndIndex = idx;
+                        onTapped: {
+                            pageContainer.selectionStartIndex = -1;
+                            pageContainer.selectionEndIndex = -1;
                             pageContainer.extractedText = "";
                         }
+                    }
 
-                        onPositionChanged: (mouse) => {
-                            if (!pageContainer.isSelecting) return;
-                            let pt = pageContainer.mapMouseToPdf(mouse.x, mouse.y);
-                            let idx = pageContainer.findNearestWordIndex(pt);
-                            if (idx >= 0)
+                    // DragHandler replaces the previous MouseArea so text
+                    // selection is handled by a non-visual input handler.
+                    // target:null prevents the handler from moving pageContainer.
+                    // CanTakeOverFromItems allows the selection gesture to take
+                    // the pointer grab from the ListView when a selection drag begins.
+                    DragHandler {
+                        id: dragSelectionHandler
+                        target: null
+                        acceptedButtons: Qt.LeftButton
+                        dragThreshold: 0
+                        grabPermissions: PointerHandler.CanTakeOverFromItems
+
+                        onActiveChanged: {
+                            if (active) {
+                                // Equivalent to onPressed
+                                if (textRects.length === 0)
+                                    return;
+
+                                let pt = pageContainer.mapMouseToPdf(
+                                    centroid.scenePosition
+                                );
+
+                                let idx = pageContainer.findNearestWordIndex(pt);
+
+                                // Do not begin a selection when the pointer
+                                // starts in whitespace.
+                                if (idx < 0) {
+                                    pageContainer.isSelecting = false;
+                                    pageContainer.selectionStartIndex = -1;
+                                    pageContainer.selectionEndIndex = -1;
+                                    pageContainer.extractedText = "";
+                                    return;
+                                }
+
+                                pageContainer.isSelecting = true;
+                                pageContainer.selectionStartIndex = idx;
                                 pageContainer.selectionEndIndex = idx;
+                                pageContainer.extractedText = "";
+                            }
+                            else {
+                                // Equivalent to onReleased
+                                if (!pageContainer.isSelecting)
+                                    return;
+
+                                pageContainer.isSelecting = false;
+
+                                let minIdx = Math.min(pageContainer.selectionStartIndex, pageContainer.selectionEndIndex);
+                                let maxIdx = Math.max(pageContainer.selectionStartIndex, pageContainer.selectionEndIndex);
+
+                                // If start and end index are identical (just a click without dragging), clear selection
+                                if (minIdx === maxIdx) {
+                                    pageContainer.selectionStartIndex = -1;
+                                    pageContainer.selectionEndIndex = -1;
+                                    pageContainer.extractedText = "";
+                                    return;
+                                }
+
+                                let collectedText = "";
+                                for (let i = minIdx; i <= maxIdx; i++) {
+                                    collectedText += textRects[i].text + " ";
+                                }
+
+                                if (collectedText.trim().length > 0) {
+                                    pageContainer.extractedText = collectedText.trim();
+                                    console.log("[QML] Range Selection Success! Copied text: " + pageContainer.extractedText);
+                                }
+                            }
                         }
 
-                        onReleased: (mouse) => {
-                            if (!pageContainer.isSelecting) return;
-                            pageContainer.isSelecting = false;
-
-                            let minIdx = Math.min(pageContainer.selectionStartIndex, pageContainer.selectionEndIndex);
-                            let maxIdx = Math.max(pageContainer.selectionStartIndex, pageContainer.selectionEndIndex);
-
-                            // If start and end index are identical (just a click without dragging), clear selection
-                            if (minIdx === maxIdx) {
-                                pageContainer.selectionStartIndex = -1;
-                                pageContainer.selectionEndIndex = -1;
-                                pageContainer.extractedText = "";
+                        onCentroidChanged: {
+                            // Equivalent to onPositionChanged
+                            if (!active || !pageContainer.isSelecting)
                                 return;
-                            }
 
-                            let collectedText = "";
-                            for (let i = minIdx; i <= maxIdx; i++) {
-                                collectedText += textRects[i].text + " ";
-                            }
+                            let pt = pageContainer.mapMouseToPdf(
+                                centroid.scenePosition
+                            );
 
-                            if (collectedText.trim().length > 0) {
-                                pageContainer.extractedText = collectedText.trim();
-                                console.log("[QML] Range Selection Success! Copied text: " + pageContainer.extractedText);
+                            let idx = pageContainer.findNearestWordIndex(pt);
+
+                            if (idx >= 0) {
+                                pageContainer.selectionEndIndex = idx;
                             }
                         }
                     }
