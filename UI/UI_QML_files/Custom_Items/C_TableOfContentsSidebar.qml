@@ -15,7 +15,9 @@ Rectangle {
     property var expansionState: ({})
 
     function getFlattenedToc(items, query, parentPath) {
-        if (!items) return [];
+        if (items === null){
+            return [];
+        }
         let result = [];
         let lowerQuery = query ? query.toLowerCase().trim() : "";
 
@@ -24,7 +26,9 @@ Rectangle {
             let currentPath = parentPath ? (parentPath + "." + i) : String(i);
 
             function hasMatch(node, q) {
-                if (!q) return true;
+                if (!q) {
+                    return true;
+                }
                 if (node.title && node.title.toLowerCase().includes(q)) return true;
                 if (node.TocItemChildren) {
                     for (let c = 0; c < node.TocItemChildren.length; ++c) {

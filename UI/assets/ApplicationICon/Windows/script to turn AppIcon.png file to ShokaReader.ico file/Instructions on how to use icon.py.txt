@@ -1,0 +1,2 @@
+just open file and change the AppIcon to the name of the new image that will
+ represent the icon, make sure to include the file type

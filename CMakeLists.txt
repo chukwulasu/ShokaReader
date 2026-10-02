@@ -4,7 +4,7 @@ project(ShokaReader VERSION 0.1 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 if(WIN32)
-    set(RESOURCE_FILES "${CMAKE_CURRENT_SOURCE_DIR}/UI/assets/ApplicationIcon/app.rc")
+    set(RESOURCE_FILES "${CMAKE_CURRENT_SOURCE_DIR}/UI/assets/ApplicationIcon/Windows/app.rc")
 else()
     set(RESOURCE_FILES "")
 endif()

@@ -11,7 +11,8 @@ ApplicationWindow {
     height: 800
     visible: true
     visibility: Window.Maximized
-    title: (documentManager.activeDocument !== null && stackView.currentItem !== null && stackView.currentItem.objectName === "readerView")
+    title: (documentManager.activeDocument !== null && stackView.currentItem !== null
+           && stackView.currentItem.objectName === "readerScreen")
            ? documentManager.activeDocument.title
            : "ShokaReader"
 
@@ -68,37 +69,39 @@ ApplicationWindow {
                     toolTipText: "Actively Reading"
                 }
 
-                C_ToolbarButton{
-                    id:bookMarkButton
-                    source: "../../assets/images/Bookmarks.png"
-                    toolTipText: "Bookmarks"
-                }
-
                 // Spacer item to push all buttons to the top and absorb remaining space when in Homescreen
                 Item{
-                    visible: !(stackView.currentItem !== null && stackView.currentItem.objectName === "readerView")
+                    visible: !(stackView.currentItem !== null && stackView.currentItem.objectName === "readerScreen")
                     Layout.fillHeight: true
+                }
+
+                C_ToolbarButton{
+                    id:searchButton
+                    source: "../../assets/images/SearchIcon.png"
+                    toolTipText: "Search Document(Ctrl + F)"
+                    visible: stackView.currentItem.objectName === "readerScreen"
+                             || stackView.currentItem.objectName === "activelyReading"
                 }
 
                 //ReaderScreen specific buttons
                 ColumnLayout{
                     spacing: 0
-                    visible: stackView.currentItem !== null && stackView.currentItem.objectName === "readerView"
+                    visible: stackView.currentItem !== null && stackView.currentItem.objectName === "readerScreen"
+
+                    C_ToolbarButton{
+                        id:bookMarkButton
+                        source: "../../assets/images/Bookmarks.png"
+                        toolTipText: "Bookmarks"
+                    }
 
                     C_ToolbarButton{
                         id:tableOfContentsButton
                         source: "../../assets/images/Table_of_contents.png"
                         toolTipText: "Table of Contents"
                         onClicked: {
-                            if (stackView.currentItem !== null && stackView.currentItem.objectName === "readerView")
+                            if (stackView.currentItem !== null && stackView.currentItem.objectName === "readerScreen")
                                 stackView.currentItem.isTableOfContentsVisible = !stackView.currentItem.isTableOfContentsVisible
                         }
-                    }
-
-                    C_ToolbarButton{
-                        id:searchButton
-                        source: "../../assets/images/SearchIcon.png"
-                        toolTipText: "Search Document(Ctrl + F)"
                     }
 
                     C_ToolbarButton{
@@ -107,7 +110,7 @@ ApplicationWindow {
                         shortcut: "Ctrl + Shift + ="
                         toolTipText: "Zoom In(Ctrl + Shift + =)"
                         onClicked:{
-                            if (stackView.currentItem !== null && stackView.currentItem.objectName === "readerView")
+                            if (stackView.currentItem !== null && stackView.currentItem.objectName === "readerScreen")
                                 stackView.currentItem.zoomIn();
                         }
                     }
@@ -118,7 +121,7 @@ ApplicationWindow {
                         shortcut: "Ctrl + Shift + -"
                         toolTipText: "Zoom Out(Ctrl + Shift + -)"
                         onClicked:{
-                            if (stackView.currentItem !== null && stackView.currentItem.objectName === "readerView")
+                            if (stackView.currentItem !== null && stackView.currentItem.objectName === "readerScreen")
                                 stackView.currentItem.zoomOut();
                         }
                     }
@@ -129,7 +132,7 @@ ApplicationWindow {
                         shortcut: "Ctrl + L"
                         toolTipText: "Rotate Left(Ctrl + L)"
                         onClicked: {
-                            if (stackView.currentItem !== null && stackView.currentItem.objectName === "readerView")
+                            if (stackView.currentItem !== null && stackView.currentItem.objectName === "readerScreen")
                                 stackView.currentItem.rotateLeft();
                         }
                     }
@@ -140,7 +143,7 @@ ApplicationWindow {
                         shortcut: "Ctrl + R"
                         toolTipText: "Rotate Right(Ctrl + R)"
                         onClicked:{
-                            if (stackView.currentItem !== null && stackView.currentItem.objectName === "readerView")
+                            if (stackView.currentItem !== null && stackView.currentItem.objectName === "readerScreen")
                                 stackView.currentItem.rotateRight();
                         }
                     }

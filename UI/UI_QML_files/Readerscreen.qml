@@ -5,7 +5,7 @@ import "Custom_Items"
 
 Rectangle {
     id: readerScreen
-    objectName: "readerView"
+    objectName: "readerScreen"
     color: "#121212"
 
     property int currentPage: 1
