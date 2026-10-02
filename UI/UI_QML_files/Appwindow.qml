@@ -162,7 +162,7 @@ ApplicationWindow {
                     C_PageNumberViewer {
                         id: pageViewer
                         Layout.preferredWidth: 47
-                        Layout.preferredHeight: 24
+                        Layout.preferredHeight: 44
                         reader: stackView.currentItem
                     }
                 }

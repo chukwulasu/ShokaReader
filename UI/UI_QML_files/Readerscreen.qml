@@ -9,7 +9,7 @@ Rectangle {
     color: "#121212"
 
     property int currentPage: 1
-    property int totalPages: documentManager.activeDocument ? documentManager.activeDocument.totalPageNumber : 0
+    property int totalPages: (documentManager.activeDocument !== null) ? documentManager.activeDocument.totalPageNumber : 0
     property real currentZoom: 1
     property real pageRotation: 0
     property bool isTableOfContentsVisible: false
