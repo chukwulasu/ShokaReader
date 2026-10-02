@@ -14,6 +14,19 @@ Rectangle {
 
     property var expansionState: ({})
 
+    // Clicking anywhere on the sidebar background dismisses focus and the cursor
+    TapHandler {
+        onTapped: {
+            if (searchField.activeFocus) {
+                if (tocSidebar.reader) {
+                    tocSidebar.reader.forceActiveFocus();
+                } else {
+                    tocSidebar.forceActiveFocus();
+                }
+            }
+        }
+    }
+
     function getFlattenedToc(items, query, parentPath) {
         if (items === null){
             return [];
@@ -111,13 +124,9 @@ Rectangle {
             rightPadding: 30
             verticalAlignment: TextInput.AlignVCenter
 
-            // Let the TextField handle its own cursor movement first.
-            // Left/Right are only blocked from reaching ReaderScreen when
-            // the TextField has no more horizontal cursor movement to perform
-            // (for example, Left at position 0 or Right at the end of the text).
-            // This keeps horizontal page scrolling independent from the search
-            // field while still allowing vertical reader scrolling to work even
-            // when the search field has keyboard focus.
+            // Cursor only renders when the field has active keyboard focus
+            cursorVisible: activeFocus
+
             Keys.priority: Keys.BeforeItem
             Keys.onPressed: (event) => {
                 if(tocSidebar.reader !== null){
@@ -208,17 +217,7 @@ Rectangle {
 
             ScrollBar.vertical: ScrollBar {
                 id: vbar
-
-                // Keep the scrollbar outside the Flickable so the Flickable's
-                // clipping does not hide the scrollbar. The immediate parent
-                // is used so x/y coordinates stay in the same coordinate system
-                // as tocFlickable.
                 parent: tocFlickable.parent
-
-                // Both the scrollbar and the Flickable now use the same parent,
-                // so these coordinates include the 12px outer Item margin.
-                // This prevents the scrollbar from moving upward into the search bar
-                // or leftward over the page-number column.
                 x: tocFlickable.x + tocFlickable.width - width - 2
                 y: tocFlickable.y
                 height: tocFlickable.height
@@ -228,8 +227,6 @@ Rectangle {
                 width: 6
                 z: 1000
 
-                // Remove the default Control padding/insets so the scrollbar
-                // can use the complete height given above.
                 padding: 0
                 topPadding: 0
                 bottomPadding: 0
@@ -241,8 +238,6 @@ Rectangle {
                 leftInset: 0
                 rightInset: 0
 
-                // Visible track kept for this test so the exact scrollbar
-                // geometry can be verified at the top and bottom.
                 background: Rectangle {
                     radius: 3
                     color: "#e1e4e8"
@@ -259,13 +254,10 @@ Rectangle {
 
             Column {
                 id: tocColumn
-                // Reserve the scrollbar width plus a small gap so the page
-                // numbers never occupy the scrollbar's horizontal space.
                 width: parent.width - vbar.width - 8
                 spacing: 2
 
                 Repeater {
-                    // Explicitly depend on expansionState so toggles force a re-evaluation
                     model: {
                         let _trigger = tocSidebar.expansionState;
                         let rawToc = documentManager.activeDocument ? documentManager.activeDocument.tableOfContents : [];
@@ -284,6 +276,13 @@ Rectangle {
                             anchors.fill: parent
                             hoverEnabled: true
                             onClicked: {
+                                // Steal focus from the search field so the cursor disappears
+                                if (searchField.activeFocus) {
+                                    if (tocSidebar.reader) {
+                                        tocSidebar.reader.forceActiveFocus();
+                                    }
+                                }
+
                                 if (modelData.pageNum !== undefined && modelData.pageNum > 0 && tocSidebar.reader) {
                                     tocSidebar.reader.jumpToPage(modelData.pageNum);
                                 }
@@ -297,7 +296,6 @@ Rectangle {
                             anchors.rightMargin: 8
                             spacing: 6
 
-                            // Toggle chevron button
                             Item {
                                 Layout.preferredWidth: 16
                                 Layout.preferredHeight: 16
@@ -323,7 +321,6 @@ Rectangle {
                                 }
                             }
 
-                            // Spacer for items without children to align titles
                             Item {
                                 Layout.preferredWidth: 16
                                 Layout.preferredHeight: 16
@@ -340,6 +337,8 @@ Rectangle {
                                 font.weight: modelData.level === 0 ? Font.Medium : Font.Normal
                                 wrapMode: Text.Wrap
                             }
+
+                            Item { Layout.fillWidth: false }
 
                             Text {
                                 Layout.preferredWidth: implicitWidth
