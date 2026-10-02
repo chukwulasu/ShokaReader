@@ -21,6 +21,14 @@ Rectangle {
         forceActiveFocus();
     }
 
+    // When the TOC is closed, return keyboard focus to the reader so the
+    // navigation keys immediately control the document again.
+    onIsTableOfContentsVisibleChanged: {
+        if (!isTableOfContentsVisible) {
+            forceActiveFocus();
+        }
+    }
+
     //TODO: remove later after you are done with the product, to be used to test lifecycle of stackview items
     Component.onDestruction: {
         console.log("[Lifecycle] Readerscreen has been destroyed and freed from memory.");
@@ -400,6 +408,11 @@ Rectangle {
                         gesturePolicy: TapHandler.DragThreshold
 
                         onTapped: {
+                            // Clicking the document also returns keyboard focus
+                            // to ReaderScreen so navigation keys no longer act on
+                            // the TOC search field after the user leaves it.
+                            readerScreen.forceActiveFocus();
+
                             pageContainer.selectionStartIndex = -1;
                             pageContainer.selectionEndIndex = -1;
                             pageContainer.extractedText = "";
@@ -420,6 +433,10 @@ Rectangle {
 
                         onActiveChanged: {
                             if (active) {
+                                // Return keyboard focus to ReaderScreen as soon
+                                // as the user begins interacting with the page.
+                                readerScreen.forceActiveFocus();
+
                                 // Equivalent to onPressed
                                 if (textRects.length === 0)
                                     return;
@@ -446,6 +463,10 @@ Rectangle {
                                 pageContainer.extractedText = "";
                             }
                             else {
+                                // Return keyboard focus to ReaderScreen after a
+                                // selection drag so page navigation remains active.
+                                readerScreen.forceActiveFocus();
+
                                 // Equivalent to onReleased
                                 if (!pageContainer.isSelecting)
                                     return;

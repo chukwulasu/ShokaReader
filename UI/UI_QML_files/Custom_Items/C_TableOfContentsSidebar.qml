@@ -111,6 +111,42 @@ Rectangle {
             rightPadding: 30
             verticalAlignment: TextInput.AlignVCenter
 
+            // Let the TextField handle its own cursor movement first.
+            // Left/Right are only blocked from reaching ReaderScreen when
+            // the TextField has no more horizontal cursor movement to perform
+            // (for example, Left at position 0 or Right at the end of the text).
+            // This keeps horizontal page scrolling independent from the search
+            // field while still allowing vertical reader scrolling to work even
+            // when the search field has keyboard focus.
+            Keys.priority: Keys.BeforeItem
+            Keys.onPressed: (event) => {
+                if(tocSidebar.reader !== null){
+                    if(event.key === Qt.Key_Home){
+                        tocSidebar.reader.goToFirstPage();
+                        event.accepted = true;
+                    }
+
+                    else if(event.key === Qt.Key_End){
+                        tocSidebar.reader.goToLastPage();
+                        event.accepted = true;
+                    }
+
+                    else if(event.key === Qt.Key_Left){
+                        if(searchField.cursorPosition > 0){
+                            searchField.cursorPosition -= 1;
+                        }
+                        event.accepted = true;
+                    }
+
+                    else if(event.key === Qt.Key_Right){
+                        if(searchField.cursorPosition < searchField.text.length){
+                            searchField.cursorPosition += 1;
+                        }
+                        event.accepted = true;
+                    }
+                }
+            }
+
             Text {
                 text: "🔍"
                 anchors.left: parent.left
@@ -194,6 +230,7 @@ Rectangle {
 
                 // Remove the default Control padding/insets so the scrollbar
                 // can use the complete height given above.
+                padding: 0
                 topPadding: 0
                 bottomPadding: 0
                 leftPadding: 0
