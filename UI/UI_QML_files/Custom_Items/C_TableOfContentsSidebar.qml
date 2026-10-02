@@ -1,5 +1,5 @@
 import QtQuick
-import QtQuick.Controls
+import QtQuick.Controls.Basic
 import QtQuick.Layouts
 import QtQml.Models
 
@@ -18,6 +18,7 @@ Rectangle {
         if (items === null){
             return [];
         }
+
         let result = [];
         let lowerQuery = query ? query.toLowerCase().trim() : "";
 
@@ -29,12 +30,14 @@ Rectangle {
                 if (!q) {
                     return true;
                 }
+
                 if (node.title && node.title.toLowerCase().includes(q)) return true;
                 if (node.TocItemChildren) {
                     for (let c = 0; c < node.TocItemChildren.length; ++c) {
                         if (hasMatch(node.TocItemChildren[c], q)) return true;
                     }
                 }
+
                 return false;
             }
 
@@ -59,16 +62,19 @@ Rectangle {
                 }
             }
         }
+
         return result;
     }
 
-    Column {
+    Item {
         anchors.fill: parent
         anchors.margins: 12
-        spacing: 10
 
         RowLayout {
-            width: parent.width
+            id: headerRow
+            anchors.top: parent.top
+            anchors.left: parent.left
+            anchors.right: parent.right
             height: 30
 
             Text {
@@ -95,7 +101,10 @@ Rectangle {
 
         TextField {
             id: searchField
-            width: parent.width
+            anchors.top: headerRow.bottom
+            anchors.topMargin: 10
+            anchors.left: parent.left
+            anchors.right: parent.right
             height: 36
             placeholderText: "Search bookmarks"
             leftPadding: 32
@@ -131,8 +140,10 @@ Rectangle {
         }
 
         Text {
-            width: parent.width
-            topPadding: 30
+            anchors.top: searchField.bottom
+            anchors.topMargin: 30
+            anchors.left: parent.left
+            anchors.right: parent.right
             horizontalAlignment: Text.AlignHCenter
             wrapMode: Text.WordWrap
             text: "Table Of Contents is Unavailable for this document"
@@ -146,8 +157,11 @@ Rectangle {
 
         Flickable {
             id: tocFlickable
-            width: parent.width
-            height: parent.height - 130
+            anchors.top: searchField.bottom
+            anchors.topMargin: 10
+            anchors.bottom: parent.bottom
+            anchors.left: parent.left
+            anchors.right: parent.right
             contentWidth: width
             contentHeight: tocColumn.height
             clip: true
@@ -156,9 +170,61 @@ Rectangle {
                 return rawToc && rawToc.length > 0;
             }
 
+            ScrollBar.vertical: ScrollBar {
+                id: vbar
+
+                // Keep the scrollbar outside the Flickable so the Flickable's
+                // clipping does not hide the scrollbar. The immediate parent
+                // is used so x/y coordinates stay in the same coordinate system
+                // as tocFlickable.
+                parent: tocFlickable.parent
+
+                // Both the scrollbar and the Flickable now use the same parent,
+                // so these coordinates include the 12px outer Item margin.
+                // This prevents the scrollbar from moving upward into the search bar
+                // or leftward over the page-number column.
+                x: tocFlickable.x + tocFlickable.width - width - 2
+                y: tocFlickable.y
+                height: tocFlickable.height
+
+                active: true
+                policy: ScrollBar.AlwaysOn
+                width: 6
+                z: 1000
+
+                // Remove the default Control padding/insets so the scrollbar
+                // can use the complete height given above.
+                topPadding: 0
+                bottomPadding: 0
+                leftPadding: 0
+                rightPadding: 0
+
+                topInset: 0
+                bottomInset: 0
+                leftInset: 0
+                rightInset: 0
+
+                // Visible track kept for this test so the exact scrollbar
+                // geometry can be verified at the top and bottom.
+                background: Rectangle {
+                    radius: 3
+                    color: "#e1e4e8"
+                }
+
+                contentItem: Rectangle {
+                    implicitWidth: 6
+                    radius: 3
+                    color: vbar.pressed
+                           ? "#505a69"
+                           : (vbar.hovered ? "#788290" : "#9da4ad")
+                }
+            }
+
             Column {
                 id: tocColumn
-                width: parent.width
+                // Reserve the scrollbar width plus a small gap so the page
+                // numbers never occupy the scrollbar's horizontal space.
+                width: parent.width - vbar.width - 8
                 spacing: 2
 
                 Repeater {
@@ -172,7 +238,7 @@ Rectangle {
                     delegate: Rectangle {
                         id: itemRow
                         width: tocColumn.width
-                        height: 32
+                        height: Math.max(32, contentRow.implicitHeight + 10)
                         color: rowHover.containsMouse ? "#eceff1" : "transparent"
                         radius: 4
 
@@ -187,7 +253,8 @@ Rectangle {
                             }
                         }
 
-                        Row {
+                        RowLayout {
+                            id: contentRow
                             anchors.fill: parent
                             anchors.leftMargin: 8 + (modelData.level * 16)
                             anchors.rightMargin: 8
@@ -195,8 +262,10 @@ Rectangle {
 
                             // Toggle chevron button
                             Item {
-                                width: 16
-                                height: parent.height
+                                Layout.preferredWidth: 16
+                                Layout.preferredHeight: 16
+                                Layout.alignment: Qt.AlignTop
+                                Layout.topMargin: 2
                                 visible: modelData.hasChildren
 
                                 Text {
@@ -219,28 +288,28 @@ Rectangle {
 
                             // Spacer for items without children to align titles
                             Item {
-                                width: 16
-                                height: parent.height
+                                Layout.preferredWidth: 16
+                                Layout.preferredHeight: 16
+                                Layout.alignment: Qt.AlignTop
                                 visible: !modelData.hasChildren
                             }
 
                             Text {
+                                Layout.fillWidth: true
+                                Layout.alignment: Qt.AlignVCenter
                                 text: modelData.title ? modelData.title : ""
                                 font.pixelSize: modelData.level === 0 ? 13 : 12
                                 color: modelData.level === 0 ? "#212529" : "#495057"
                                 font.weight: modelData.level === 0 ? Font.Medium : Font.Normal
-                                anchors.verticalCenter: parent.verticalCenter
-                                width: parent.width - 50 - (modelData.level * 16)
-                                elide: Text.ElideRight
+                                wrapMode: Text.Wrap
                             }
 
-                            Item { width: 1; height: 1 } // flex filler
-
                             Text {
+                                Layout.preferredWidth: implicitWidth
+                                Layout.alignment: Qt.AlignVCenter
                                 text: (modelData.pageNum !== undefined && modelData.pageNum > 0) ? modelData.pageNum : ""
                                 font.pixelSize: 11
                                 color: "#868e96"
-                                anchors.verticalCenter: parent.verticalCenter
                             }
                         }
                     }
