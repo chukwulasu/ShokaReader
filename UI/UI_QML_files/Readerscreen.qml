@@ -14,6 +14,237 @@ Rectangle {
     property real pageRotation: 0
     property bool isTableOfContentsVisible: false
 
+    // Multi-page document selection tracking
+    property int selStartPage: -1
+    property int selStartWord: -1
+    property int selEndPage: -1
+    property int selEndWord: -1
+    property bool isSelectingGlobal: false
+    property string activeSelectedText: ""
+
+    // Auto-scroll state during selection
+    property real autoScrollSpeed: 0
+
+    Timer {
+        id: autoScrollTimer
+        interval: 16 // ~60 FPS smooth scrolling
+        running: autoScrollSpeed !== 0
+        repeat: true
+        onTriggered: {
+            if (autoScrollSpeed !== 0) {
+                let newY = listView.contentY + autoScrollSpeed;
+                listView.contentY = Math.max(0, Math.min(newY, listView.contentHeight - listView.height));
+            }
+        }
+    }
+
+    // Global hit-test helper to find which page and which word is under the pointer
+    function hitTestGlobal(scenePt) {
+        let contentPt = listView.contentItem.mapFromItem(null, scenePt.x, scenePt.y);
+        let targetIndex = listView.indexAt(contentPt.x, contentPt.y);
+        if (targetIndex < 0 || targetIndex >= totalPages) return null;
+
+        let delegateItem = listView.itemAtIndex(targetIndex);
+        if (!delegateItem) return null;
+
+        let pageBox = delegateItem.pageContainerRef;
+        if (!pageBox) return null;
+
+        let pdfPt = pageBox.mapMouseToPdf(scenePt);
+        let wordIdx = pageBox.findNearestWordIndex(pdfPt);
+
+        return {
+            page: targetIndex,
+            word: wordIdx
+        };
+    }
+
+    function escapeHtml(str) {
+        return str.replace(/&/g, "&amp;")
+                  .replace(/</g, "&lt;")
+                  .replace(/>/g, "&gt;")
+                  .replace(/"/g, "&quot;")
+                  .replace(/'/g, "&#039;");
+    }
+
+    // Collects text preserving line wraps, paragraph structure, alignment, and proportional font size
+    function collectGlobalText() {
+        if (selStartPage === -1 || selEndPage === -1 || !documentManager.activeDocument) {
+            return "";
+        }
+
+        let isForward = (selStartPage < selEndPage) || (selStartPage === selEndPage && selStartWord <= selEndWord);
+        let pStart = isForward ? selStartPage : selEndPage;
+        let pEnd   = isForward ? selEndPage : selStartPage;
+        let wStart = isForward ? selStartWord : selEndWord;
+        let wEnd   = isForward ? selEndWord : selStartWord;
+
+        let htmlOutput = "";
+
+        for (let p = pStart; p <= pEnd; ++p) {
+            let rects = documentManager.activeDocument.getPageTextRects(p);
+            if (!rects || rects.length === 0) continue;
+
+            let pageSize = (typeof documentManager.activeDocument.getPageSizePoints === "function")
+                           ? documentManager.activeDocument.getPageSizePoints(p)
+                           : Qt.size(612, 792);
+            let pageWidth = (pageSize && pageSize.width > 0) ? pageSize.width : 612;
+
+            let firstW = (p === pStart) ? Math.max(0, wStart) : 0;
+            let lastW  = (p === pEnd)   ? Math.min(rects.length - 1, wEnd) : rects.length - 1;
+
+            if (firstW > lastW) continue;
+
+            // 1. Group selected boxes on this page into visual lines
+            let lines = [];
+            let currentLine = [];
+
+            for (let w = firstW; w <= lastW; ++w) {
+                let box = rects[w];
+                if (!box || !box.text) continue;
+
+                if (currentLine.length === 0) {
+                    currentLine.push(box);
+                } else {
+                    let prevBox = currentLine[currentLine.length - 1];
+                    let overlapTop = Math.max(prevBox.y, box.y);
+                    let overlapBottom = Math.min(prevBox.y + prevBox.height, box.y + box.height);
+                    let overlap = Math.max(0, overlapBottom - overlapTop);
+                    let minH = Math.min(prevBox.height, box.height);
+                    let sameLine = (minH > 0 && overlap >= minH * 0.45);
+
+                    if (sameLine) {
+                        currentLine.push(box);
+                    } else {
+                        lines.push(currentLine);
+                        currentLine = [box];
+                    }
+                }
+            }
+            if (currentLine.length > 0) {
+                lines.push(currentLine);
+            }
+
+            if (lines.length === 0) continue;
+
+            // 2. Identify the standard body text left margin for this page
+            let bodyLeftMargin = 999999;
+            for (let ln of lines) {
+                let minX = ln[0].x;
+                for (let b of ln) {
+                    if (b.x < minX) minX = b.x;
+                }
+                if (ln.length >= 3 && minX < bodyLeftMargin) {
+                    bodyLeftMargin = minX;
+                }
+            }
+            if (bodyLeftMargin === 999999) {
+                bodyLeftMargin = 72;
+            }
+
+            // 3. Process each line, capturing text alignment and font size in points
+            let prevLineInfo = null;
+            let currentParagraphLines = [];
+            let currentParagraphIsCentered = false;
+            let currentParagraphFontSize = 11;
+
+            function flushParagraph() {
+                if (currentParagraphLines.length === 0) return;
+                let textContent = currentParagraphLines.join(currentParagraphIsCentered ? "<br/>" : " ");
+
+                let style = "margin: 6px 0; font-size: " + currentParagraphFontSize + "pt;";
+                if (currentParagraphIsCentered) {
+                    style += " text-align: center;";
+                    htmlOutput += "<p align=\"center\" style=\"" + style + "\">" + textContent + "</p>";
+                } else {
+                    style += " text-align: left;";
+                    htmlOutput += "<p align=\"left\" style=\"" + style + "\">" + textContent + "</p>";
+                }
+
+                currentParagraphLines = [];
+            }
+
+            for (let ln of lines) {
+                let lineMinX = ln[0].x;
+                let lineMaxX = ln[0].x + ln[0].width;
+                let lineMinY = ln[0].y;
+                let lineMaxY = ln[0].y + ln[0].height;
+                let words = [];
+                let maxWordHeight = 0;
+
+                for (let b of ln) {
+                    if (b.x < lineMinX) lineMinX = b.x;
+                    if (b.x + b.width > lineMaxX) lineMaxX = b.x + b.width;
+                    if (b.y < lineMinY) lineMinY = b.y;
+                    if (b.y + b.height > lineMaxY) lineMaxY = b.y + b.height;
+                    if (b.height > maxWordHeight) maxWordHeight = b.height;
+                    words.push(escapeHtml(b.text));
+                }
+
+                let lineText = words.join(" ");
+                let leftMargin = lineMinX;
+                let rightMargin = pageWidth - lineMaxX;
+                let marginDiff = Math.abs(leftMargin - rightMargin);
+                let lineWidth = lineMaxX - lineMinX;
+
+                // Center alignment check
+                let isCentered = (marginDiff < 32) && (leftMargin > bodyLeftMargin + 18 || lineWidth < pageWidth * 0.65);
+
+                // Line font size in points directly from word bounding heights
+                let lineFontSize = Math.max(6, Math.round(maxWordHeight));
+
+                let isNewBlock = false;
+                if (!prevLineInfo) {
+                    isNewBlock = true;
+                } else {
+                    let vGap = lineMinY - prevLineInfo.maxY;
+                    let prevH = prevLineInfo.maxY - prevLineInfo.minY;
+                    let fontDiff = Math.abs(lineFontSize - prevLineInfo.fontSize);
+
+                    // Break paragraph if alignment switches, vertical gap is large, or font size shifts noticeably (>= 3pt)
+                    if (isCentered !== prevLineInfo.isCentered || vGap > prevH * 0.55 || fontDiff >= 3) {
+                        isNewBlock = true;
+                    }
+                }
+
+                if (isNewBlock) {
+                    flushParagraph();
+                    currentParagraphIsCentered = isCentered;
+                    currentParagraphFontSize = lineFontSize;
+                }
+
+                currentParagraphLines.push(lineText);
+
+                prevLineInfo = {
+                    minY: lineMinY,
+                    maxY: lineMaxY,
+                    isCentered: isCentered,
+                    fontSize: lineFontSize
+                };
+            }
+
+            flushParagraph();
+        }
+
+        return htmlOutput;
+    }
+
+    // Clipboard helper for QML with RichText support
+    TextEdit {
+        id: clipboardBridge
+        visible: false
+        textFormat: TextEdit.RichText
+    }
+
+    function copyToClipboard(textToCopy) {
+        if (!textToCopy || textToCopy.length === 0) return;
+        clipboardBridge.textFormat = TextEdit.RichText;
+        clipboardBridge.text = textToCopy;
+        clipboardBridge.selectAll();
+        clipboardBridge.copy();
+        console.log("[Clipboard] Copied formatted text with alignment and font sizes preserved.");
+    }
+
     focus: true
     activeFocusOnTab: true
 
@@ -96,6 +327,15 @@ Rectangle {
         currentPage = totalPages;
         listView.currentIndex = totalPages - 1;
         listView.positionViewAtEnd();
+    }
+
+    // Global Ctrl+C Shortcut
+    Shortcut {
+        sequence: [StandardKey.Copy]
+        enabled: readerScreen.activeSelectedText.length > 0
+        onActivated: {
+            readerScreen.copyToClipboard(readerScreen.activeSelectedText);
+        }
     }
 
     Keys.onPressed: (event) => {
@@ -185,7 +425,6 @@ Rectangle {
                 }
             }
 
-
             flickableDirection: Flickable.HorizontalAndVerticalFlick
 
             // This forces the horizontal scrollbar handle to shrink and stops it from snapping back.
@@ -222,10 +461,143 @@ Rectangle {
                 policy: ScrollBar.AlwaysOn
                 z: 100
             }
+
+            // Global TapHandler to dismiss selection on a plain left-click
+            TapHandler {
+                acceptedButtons: Qt.LeftButton
+                gesturePolicy: TapHandler.DragThreshold
+                onTapped: {
+                    readerScreen.forceActiveFocus();
+                    readerScreen.selStartPage = -1;
+                    readerScreen.selStartWord = -1;
+                    readerScreen.selEndPage = -1;
+                    readerScreen.selEndWord = -1;
+                    readerScreen.activeSelectedText = "";
+                    globalFloatingCopyMenu.visible = false;
+                }
+            }
+
+            // Global Right-Click Handler for Floating Copy Menu
+            TapHandler {
+                acceptedButtons: Qt.RightButton
+                onTapped: {
+                    if (readerScreen.activeSelectedText.length === 0) return;
+
+                    let hit = readerScreen.hitTestGlobal(point.scenePosition);
+                    if (!hit || hit.word < 0) {
+                        globalFloatingCopyMenu.visible = false;
+                        return;
+                    }
+
+                    // Position the menu relative to the ListView viewport
+                    let localPos = listView.mapFromItem(null, point.scenePosition.x, point.scenePosition.y);
+                    globalFloatingCopyMenu.x = Math.max(8, Math.min(localPos.x, listView.width - globalFloatingCopyMenu.width - 8));
+                    globalFloatingCopyMenu.y = (localPos.y - globalFloatingCopyMenu.height - 4 < 0)
+                                               ? (localPos.y + 4)
+                                               : (localPos.y - globalFloatingCopyMenu.height - 4);
+                    globalFloatingCopyMenu.visible = true;
+                }
+            }
+
+            // GLOBAL DRAG HANDLER: Spans across page delegates and boundaries
+            DragHandler {
+                id: globalDragSelection
+                target: null
+                acceptedButtons: Qt.LeftButton
+                dragThreshold: 0
+                grabPermissions: PointerHandler.CanTakeOverFromItems
+
+                onActiveChanged: {
+                    if (active) {
+                        readerScreen.forceActiveFocus();
+                        globalFloatingCopyMenu.visible = false;
+
+                        let hit = readerScreen.hitTestGlobal(centroid.scenePosition);
+                        if (!hit || hit.word < 0) {
+                            readerScreen.isSelectingGlobal = false;
+                            readerScreen.selStartPage = -1;
+                            readerScreen.selStartWord = -1;
+                            readerScreen.selEndPage = -1;
+                            readerScreen.selEndWord = -1;
+                            readerScreen.activeSelectedText = "";
+                            return;
+                        }
+
+                        readerScreen.isSelectingGlobal = true;
+                        readerScreen.selStartPage = hit.page;
+                        readerScreen.selStartWord = hit.word;
+                        readerScreen.selEndPage = hit.page;
+                        readerScreen.selEndWord = hit.word;
+                        readerScreen.activeSelectedText = "";
+                    } else {
+                        readerScreen.autoScrollSpeed = 0;
+                        readerScreen.forceActiveFocus();
+
+                        if (!readerScreen.isSelectingGlobal) return;
+                        readerScreen.isSelectingGlobal = false;
+
+                        let text = readerScreen.collectGlobalText();
+                        if (text.length > 0) {
+                            readerScreen.activeSelectedText = text;
+                        } else {
+                            readerScreen.selStartPage = -1;
+                            readerScreen.selStartWord = -1;
+                            readerScreen.selEndPage = -1;
+                            readerScreen.selEndWord = -1;
+                            readerScreen.activeSelectedText = "";
+                        }
+                    }
+                }
+
+                onCentroidChanged: {
+                    if (!active || !readerScreen.isSelectingGlobal) {
+                        readerScreen.autoScrollSpeed = 0;
+                        return;
+                    }
+
+                    // 1. Edge Proximity Auto-Scroll Detection
+                    let viewPos = listView.mapFromItem(null, centroid.scenePosition.x, centroid.scenePosition.y);
+                    let margin = 50;
+
+                    if (viewPos.y < margin) {
+                        let factor = Math.max(0, 1 - (viewPos.y / margin));
+                        readerScreen.autoScrollSpeed = -(10 + factor * 25);
+                    } else if (viewPos.y > (listView.height - margin)) {
+                        let factor = Math.max(0, (viewPos.y - (listView.height - margin)) / margin);
+                        readerScreen.autoScrollSpeed = 10 + factor * 25;
+                    } else {
+                        readerScreen.autoScrollSpeed = 0;
+                    }
+
+                    // 2. Global page & word coordinate tracking across boundaries
+                    let hit = readerScreen.hitTestGlobal(centroid.scenePosition);
+                    if (hit && hit.page >= 0) {
+                        readerScreen.selEndPage = hit.page;
+
+                        if (hit.word >= 0) {
+                            readerScreen.selEndWord = hit.word;
+                        }
+                    }
+                }
+            }
+
+            // Global floating copy menu inside the ListView viewport
+            C_FloatingCopyMenu {
+                id: globalFloatingCopyMenu
+                visible: false
+                z: 200
+
+                onCopyTriggered: {
+                    readerScreen.copyToClipboard(readerScreen.activeSelectedText);
+                    visible = false;
+                }
+            }
+
             delegate: Item {
                 id: pageDelegate
                 property var textRects: []
                 property var pageSizePoints: Qt.size(0, 0)
+                property alias pageContainerRef: pageContainer
 
                 property real uniformWidth: listView.width * 0.65
                 property real pageAspectRatio:
@@ -248,6 +620,7 @@ Rectangle {
                         pageSizePoints = documentManager.activeDocument.getPageSizePoints(index);
                     }
                 }
+
                 Rectangle {
                     id: pageContainer
                     anchors.centerIn: parent
@@ -257,11 +630,6 @@ Rectangle {
                     color: "#FFFFFF"
                     border.color: "#333333"
                     border.width: 1
-
-                    property bool isSelecting: false
-                    property int selectionStartIndex: -1
-                    property int selectionEndIndex: -1
-                    property string extractedText: ""
 
                     function mapMouseToPdf(scenePoint) {
                         // Convert the pointer from scene coordinates into the
@@ -282,12 +650,11 @@ Rectangle {
                         );
                     }
 
-                    // Rectangle-aware hit testing to prevent selection jumping
+                    // Geometry-aware hit testing to prevent premature selection jumping
                     function findNearestWordIndex(pt) {
-                        if (textRects.length === 0)
-                            return -1;
+                        if (textRects.length === 0) return -1;
 
-                        // First: exact hit test inside box bounds
+                        // 1. Exact hit test inside box bounds
                         for (let i = 0; i < textRects.length; ++i) {
                             let box = textRects[i];
                             if (pt.x >= box.x && pt.x <= box.x + box.width &&
@@ -296,10 +663,33 @@ Rectangle {
                             }
                         }
 
-                        // Second: nearest rectangle scoring
-                        // Intentionally no longer used: whitespace must not
-                        // select an arbitrary word above or below the pointer.
-                        return -1;
+                        // 2. Pointer is strictly above the first text line on this page
+                        if (pt.y < textRects[0].y) {
+                            return 0;
+                        }
+
+                        // 3. Pointer is strictly below the last text line on this page
+                        let lastBox = textRects[textRects.length - 1];
+                        if (pt.y > lastBox.y + lastBox.height) {
+                            return textRects.length - 1;
+                        }
+
+                        // 4. Pointer is on a line but within horizontal whitespace
+                        let closestIdx = -1;
+                        let minDistance = 999999;
+
+                        for (let i = 0; i < textRects.length; ++i) {
+                            let box = textRects[i];
+                            if (pt.y >= box.y - 4 && pt.y <= box.y + box.height + 4) {
+                                let dist = Math.abs(pt.x - (box.x + box.width / 2));
+                                if (dist < minDistance) {
+                                    minDistance = dist;
+                                    closestIdx = i;
+                                }
+                            }
+                        }
+
+                        return closestIdx;
                     }
 
                     function boxesAreOnSameLine(a, b) {
@@ -312,16 +702,32 @@ Rectangle {
                         return smallerHeight > 0 && overlap >= smallerHeight * 0.5;
                     }
 
-                    // Computes continuous line spans based on actual vertical overlap relationships
+                    // Computes line spans for this specific page based on the global selection range
                     function getSelectedLineSpans() {
-                        if (selectionStartIndex === -1 || selectionEndIndex === -1 || textRects.length === 0)
+                        let sPage = readerScreen.selStartPage;
+                        let ePage = readerScreen.selEndPage;
+                        let sWord = readerScreen.selStartWord;
+                        let eWord = readerScreen.selEndWord;
+
+                        if (sPage === -1 || ePage === -1 || sWord === -1 || eWord === -1 || textRects.length === 0)
                             return [];
 
-                        let minIdx = Math.min(selectionStartIndex, selectionEndIndex);
-                        let maxIdx = Math.max(selectionStartIndex, selectionEndIndex);
+                        let isForward = (sPage < ePage) || (sPage === ePage && sWord <= eWord);
+                        let pStart = isForward ? sPage : ePage;
+                        let pEnd   = isForward ? ePage : sPage;
+                        let wStart = isForward ? sWord : eWord;
+                        let wEnd   = isForward ? eWord : sWord;
+
+                        if (index < pStart || index > pEnd)
+                            return [];
+
+                        let firstWord = (index === pStart) ? Math.max(0, wStart) : 0;
+                        let lastWord  = (index === pEnd)   ? Math.min(textRects.length - 1, wEnd) : textRects.length - 1;
+
+                        if (firstWord > lastWord) return [];
 
                         let selectedBoxes = [];
-                        for (let i = minIdx; i <= maxIdx; i++) {
+                        for (let i = firstWord; i <= lastWord; i++) {
                             selectedBoxes.push(textRects[i]);
                         }
 
@@ -378,11 +784,13 @@ Rectangle {
                         asynchronous: true
                     }
 
-                    // CONTINUOUS HIGHLIGHTER: Repaints whenever selection indexes update
+                    // Highlights react to global selection page & word updates
                     Repeater {
                         model: {
-                            let s1 = pageContainer.selectionStartIndex;
-                            let s2 = pageContainer.selectionEndIndex;
+                            let _trigger1 = readerScreen.selStartPage;
+                            let _trigger2 = readerScreen.selStartWord;
+                            let _trigger3 = readerScreen.selEndPage;
+                            let _trigger4 = readerScreen.selEndWord;
                             return pageContainer.getSelectedLineSpans();
                         }
                         delegate: Rectangle {
@@ -395,122 +803,6 @@ Rectangle {
 
                             color: "#400000FF" // Smooth semi-transparent blue highlight ribbon
                             border.color: "transparent"
-                        }
-                    }
-
-                    // TapHandler is used for a plain click so an existing
-                    // selection can be cleared without requiring another drag.
-                    // Its default DragThreshold policy lets it cooperate with
-                    // the DragHandler below and cancel itself when a drag starts.
-                    TapHandler {
-                        id: clearSelectionHandler
-                        acceptedButtons: Qt.LeftButton
-                        gesturePolicy: TapHandler.DragThreshold
-
-                        onTapped: {
-                            // Clicking the document also returns keyboard focus
-                            // to ReaderScreen so navigation keys no longer act on
-                            // the TOC search field after the user leaves it.
-                            readerScreen.forceActiveFocus();
-
-                            pageContainer.selectionStartIndex = -1;
-                            pageContainer.selectionEndIndex = -1;
-                            pageContainer.extractedText = "";
-                        }
-                    }
-
-                    // DragHandler replaces the previous MouseArea so text
-                    // selection is handled by a non-visual input handler.
-                    // target:null prevents the handler from moving pageContainer.
-                    // CanTakeOverFromItems allows the selection gesture to take
-                    // the pointer grab from the ListView when a selection drag begins.
-                    DragHandler {
-                        id: dragSelectionHandler
-                        target: null
-                        acceptedButtons: Qt.LeftButton
-                        dragThreshold: 0
-                        grabPermissions: PointerHandler.CanTakeOverFromItems
-
-                        onActiveChanged: {
-                            if (active) {
-                                // Return keyboard focus to ReaderScreen as soon
-                                // as the user begins interacting with the page.
-                                readerScreen.forceActiveFocus();
-
-                                // Equivalent to onPressed
-                                if (textRects.length === 0)
-                                    return;
-
-                                let pt = pageContainer.mapMouseToPdf(
-                                    centroid.scenePosition
-                                );
-
-                                let idx = pageContainer.findNearestWordIndex(pt);
-
-                                // Do not begin a selection when the pointer
-                                // starts in whitespace.
-                                if (idx < 0) {
-                                    pageContainer.isSelecting = false;
-                                    pageContainer.selectionStartIndex = -1;
-                                    pageContainer.selectionEndIndex = -1;
-                                    pageContainer.extractedText = "";
-                                    return;
-                                }
-
-                                pageContainer.isSelecting = true;
-                                pageContainer.selectionStartIndex = idx;
-                                pageContainer.selectionEndIndex = idx;
-                                pageContainer.extractedText = "";
-                            }
-                            else {
-                                // Return keyboard focus to ReaderScreen after a
-                                // selection drag so page navigation remains active.
-                                readerScreen.forceActiveFocus();
-
-                                // Equivalent to onReleased
-                                if (!pageContainer.isSelecting)
-                                    return;
-
-                                pageContainer.isSelecting = false;
-
-                                let minIdx = Math.min(pageContainer.selectionStartIndex, pageContainer.selectionEndIndex);
-                                let maxIdx = Math.max(pageContainer.selectionStartIndex, pageContainer.selectionEndIndex);
-
-                                // If start and end index are identical (just a click without dragging), clear selection
-                                if (minIdx === maxIdx) {
-                                    pageContainer.selectionStartIndex = -1;
-                                    pageContainer.selectionEndIndex = -1;
-                                    pageContainer.extractedText = "";
-                                    return;
-                                }
-
-                                let collectedText = "";
-                                for (let i = minIdx; i <= maxIdx; i++) {
-                                    collectedText += textRects[i].text + " ";
-                                }
-
-                                if (collectedText.trim().length > 0) {
-                                    pageContainer.extractedText = collectedText.trim();
-                                    //TODO: remove in final product
-                                    console.log("[QML] Range Selection Success! Copied text: " + pageContainer.extractedText);
-                                }
-                            }
-                        }
-
-                        onCentroidChanged: {
-                            // Equivalent to onPositionChanged
-                            if (!active || !pageContainer.isSelecting)
-                                return;
-
-                            let pt = pageContainer.mapMouseToPdf(
-                                centroid.scenePosition
-                            );
-
-                            let idx = pageContainer.findNearestWordIndex(pt);
-
-                            if (idx >= 0) {
-                                pageContainer.selectionEndIndex = idx;
-                            }
                         }
                     }
                 }
