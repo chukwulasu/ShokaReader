@@ -154,6 +154,18 @@ ApplicationWindow {
                         toolTipText: "TTS"
                     }
 
+                    C_ToolbarButton{
+                        id:permissionLockButton
+                        source: "../../assets/images/LockIcon.png"
+                        toolTipText: "Unlock Permissions"
+                        visible: documentManager.activeDocument !== null && !documentManager.activeDocument.canCopy
+                        onClicked: {
+                            ownerPasswordDialog.errorMessage = "";
+                            ownerPasswordTextField.text = "";
+                            ownerPasswordDialog.open();
+                        }
+                    }
+
                     // Spacer item to push all buttons to the top and absorb remaining space when in Readerscreen
                     Item{
                         Layout.fillHeight: true
@@ -204,9 +216,142 @@ ApplicationWindow {
             stackView.replace("Readerscreen.qml",StackView.Immediate);
         }
 
+        function onDocumentLocked(fileName) {
+            passwordDialog.targetFileName = fileName;
+            passwordDialog.errorMessage = "";
+            passwordTextField.text = "";
+            passwordDialog.open();
+        }
+
         function onErrorOccurred(errorMessage) {
             errorDialogText.text = errorMessage;
             errorDialogWindow.open();
+        }
+    }
+
+    Dialog {
+        id: passwordDialog
+        title: "Password Required"
+        anchors.centerIn: parent
+        modal: true
+
+        property string targetFileName: ""
+        property string errorMessage: ""
+
+        contentItem: ColumnLayout {
+            spacing: 12
+
+            Label {
+                text: "\"" + passwordDialog.targetFileName + "\" is password protected."
+            }
+
+            TextField {
+                id: passwordTextField
+                Layout.fillWidth: true
+                echoMode: TextInput.Password
+                placeholderText: "Enter Password"
+                focus: true
+                onAccepted: {
+                    if (documentManager.unlockPendingDocument(passwordTextField.text)) {
+                        passwordDialog.close();
+                    } else {
+                        passwordDialog.errorMessage = "Incorrect password. Please try again.";
+                    }
+                }
+            }
+
+            Label {
+                text: passwordDialog.errorMessage
+                color: "#FF4D4D"
+                visible: passwordDialog.errorMessage !== ""
+            }
+        }
+
+        footer: RowLayout {
+            Item {
+                Layout.fillWidth: true
+            }
+
+            Button {
+                text: "Cancel"
+                onClicked: {
+                    documentManager.cancelPendingDocument();
+                    passwordDialog.close();
+                }
+            }
+
+            Button {
+                text: "OK"
+                onClicked: {
+                    if (documentManager.unlockPendingDocument(passwordTextField.text)) {
+                        passwordDialog.close();
+                    } else {
+                        passwordDialog.errorMessage = "Incorrect password. Please try again.";
+                    }
+                }
+            }
+        }
+    }
+
+    Dialog {
+        id: ownerPasswordDialog
+        title: "Permissions Locked"
+        anchors.centerIn: parent
+        modal: true
+
+        property string errorMessage: ""
+
+        contentItem: ColumnLayout {
+            spacing: 12
+
+            Label {
+                text: "Enter Owner Password to unlock copying and printing."
+            }
+
+            TextField {
+                id: ownerPasswordTextField
+                Layout.fillWidth: true
+                echoMode: TextInput.Password
+                placeholderText: "Enter Owner Password"
+                focus: true
+                onAccepted: {
+                    if (documentManager.activeDocument !== null && documentManager.activeDocument.unlockPermissions(ownerPasswordTextField.text)) {
+                        ownerPasswordDialog.close();
+                    } else {
+                        ownerPasswordDialog.errorMessage = "Incorrect owner password. Please try again.";
+                    }
+                }
+            }
+
+            Label {
+                text: ownerPasswordDialog.errorMessage
+                color: "#FF4D4D"
+                visible: ownerPasswordDialog.errorMessage !== ""
+            }
+        }
+
+        footer: RowLayout {
+            Item {
+                Layout.fillWidth: true
+            }
+
+            Button {
+                text: "Cancel"
+                onClicked: {
+                    ownerPasswordDialog.close();
+                }
+            }
+
+            Button {
+                text: "OK"
+                onClicked: {
+                    if (documentManager.activeDocument !== null && documentManager.activeDocument.unlockPermissions(ownerPasswordTextField.text)) {
+                        ownerPasswordDialog.close();
+                    } else {
+                        ownerPasswordDialog.errorMessage = "Incorrect owner password. Please try again.";
+                    }
+                }
+            }
         }
     }
 

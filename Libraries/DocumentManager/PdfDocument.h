@@ -10,10 +10,12 @@ class PdfDocument : public DocumentBase {
 public:
     explicit PdfDocument(QObject* parent = nullptr);
     ~PdfDocument() override;
-    bool getDocumentMetaData(const QUrl& filePath) override;
+    DocumentState getDocumentMetaData(const QUrl& filePath) override;
+    bool unlock(const QString& password) override;
+    bool unlockPermissions(const QString& ownerPassword) override;
     QImage getPageImageData(int pageIndex) override;
     const QVector<TocItem>& getTableOfContents() override;
-   
+
     /*
     Returns a contiguous QList of TextRectItem structs holding
     the text string and bounding box in PDF points for each word.
@@ -28,7 +30,9 @@ public:
 private:
     // Recursive helper functions to parse Poppler's TOC tree
     void parsePopplerToc(const QVector<Poppler::OutlineItem>& items, QVector<TocItem>& tocVector, int currentDepth = 0);
+    void updatePermissions();
 
 private:
     std::unique_ptr<Poppler::Document> m_pdfDocument = nullptr;
+    QString m_cachedUserPassword = "";
 };

@@ -60,6 +60,7 @@ qt_add_qml_module(ShokaReader
     UI/assets/images/RotateLeft.png
     UI/assets/images/RotateRight.png
     UI/assets/images/TTSImage.png
+    UI/assets/images/LockIcon.png
 )
 
 # Qt for iOS sets MACOSX_BUNDLE_GUI_IDENTIFIER automatically since Qt 6.1.

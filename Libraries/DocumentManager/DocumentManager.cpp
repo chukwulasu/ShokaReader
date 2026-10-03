@@ -27,7 +27,7 @@ void DocumentManager::openDocument(const QUrl& filePath) {
     DocumentType fileType = getFileType(filePath);
     if (fileType == DocumentType::Invalid) {
         const QString errorMessage = QFileInfo(filePath.toLocalFile()).completeBaseName() +
-            "is missing or an invalid file";
+                                     "is missing or an invalid file";
         emit errorOccurred(errorMessage);
         return;
     }
@@ -38,24 +38,52 @@ void DocumentManager::openDocument(const QUrl& filePath) {
     }
 
     if (fileType == DocumentType::PDF) {
-       m_activeDocument = std::make_unique<PdfDocument>();
+        m_pendingDocument = std::make_unique<PdfDocument>();
     }
 
     /* else if (type == DocumentType::EPUB) {
-       m_activeDocument = std::make_unique<EpubDocument>();
+        m_activeDocument = std::make_unique<EpubDocument>();
     } */
 
-   if(m_activeDocument->getDocumentMetaData(filePath) == true){
+    DocumentState state = m_pendingDocument->getDocumentMetaData(filePath);
+    if (state == DocumentState::LoadSuccessful) {
+        m_activeDocument = std::move(m_pendingDocument);
         emit activeDocumentChanged();
-   }else{
-       const QString errorMessage = "Failed to open " + QFileInfo(filePath.toLocalFile()).completeBaseName();
-       emit errorOccurred(errorMessage);
-   }
+    } else if (state == DocumentState::Locked) {
+        emit documentLocked(m_pendingDocument->getTitle());
+    } else {
+        m_pendingDocument.reset();
+        const QString errorMessage = "Failed to open " + QFileInfo(filePath.toLocalFile()).completeBaseName();
+        emit errorOccurred(errorMessage);
+    }
+}
+
+bool DocumentManager::unlockPendingDocument(const QString& password) {
+    if (m_pendingDocument == nullptr) {
+        return false;
+    }
+
+    if (m_pendingDocument->unlock(password) == true) {
+        m_activeDocument = std::move(m_pendingDocument);
+        emit activeDocumentChanged();
+        return true;
+    }
+
+    return false;
+}
+
+void DocumentManager::cancelPendingDocument() {
+    if (m_pendingDocument != nullptr) {
+        m_pendingDocument.reset();
+    }
 }
 
 void DocumentManager::releaseDocument(){
     if(m_activeDocument != nullptr){
         m_activeDocument = nullptr;
+    }
+    if(m_pendingDocument != nullptr){
+        m_pendingDocument = nullptr;
     }
 }
 

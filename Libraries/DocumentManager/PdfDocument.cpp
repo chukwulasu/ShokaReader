@@ -8,28 +8,105 @@ PdfDocument::PdfDocument(QObject* parent)
 
 PdfDocument::~PdfDocument() = default;
 
-bool PdfDocument::getDocumentMetaData(const QUrl& filePath) {
+DocumentState PdfDocument::getDocumentMetaData(const QUrl& filePath) {
+    m_cachedUserPassword.clear();
     m_fileUrl = filePath;
     QString localPath = filePath.toLocalFile();
 
     m_pdfDocument = Poppler::Document::load(localPath);
     // TODO: write code to provide dialog to unlokck locked pdf files
-    if (m_pdfDocument == nullptr || m_pdfDocument->isLocked() == true) {
+    if (m_pdfDocument == nullptr) {
         m_totalPageNumber = 0;
         m_title.clear();
-        m_pdfDocument.reset();
         m_tableOfContents.clear();
-        return false;
-    } else {
-        m_totalPageNumber = m_pdfDocument->numPages();
-        m_title = QFileInfo(localPath).completeBaseName();
-        m_tableOfContents.clear();
+        return DocumentState::LoadFailed;
     }
-    return true;
+
+    m_title = QFileInfo(localPath).completeBaseName();
+
+    if (m_pdfDocument->isLocked() == true) {
+        m_totalPageNumber = 0;
+        m_tableOfContents.clear();
+        return DocumentState::Locked;
+    }
+
+    m_totalPageNumber = m_pdfDocument->numPages();
+    m_tableOfContents.clear();
+    updatePermissions();
+    return DocumentState::LoadSuccessful;
+}
+
+bool PdfDocument::unlock(const QString& password) {
+    if (m_pdfDocument == nullptr || m_pdfDocument->isLocked() == false) {
+        return false;
+    }
+
+    m_cachedUserPassword = password;
+    QByteArray passBytes = password.toUtf8();
+
+    // Attempt to unlock with the provided password
+    m_pdfDocument->unlock(passBytes, passBytes);
+
+    if (m_pdfDocument->isLocked() == true) {
+        m_pdfDocument->unlock(QByteArray(), passBytes);
+    }
+
+    if (m_pdfDocument->isLocked() == true) {
+        m_pdfDocument->unlock(passBytes, QByteArray());
+    }
+
+    // Verify whether Poppler decrypted the document
+    if (m_pdfDocument->isLocked() == false) {
+        m_totalPageNumber = m_pdfDocument->numPages();
+        m_tableOfContents.clear();
+        updatePermissions();
+        return true;
+    }
+
+    return false;
+}
+
+bool PdfDocument::unlockPermissions(const QString& ownerPassword) {
+    if (m_pdfDocument == nullptr) {
+        return false;
+    }
+
+    QString localPath = m_fileUrl.toLocalFile();
+    QByteArray ownerBytes = ownerPassword.toUtf8();
+
+    std::unique_ptr<Poppler::Document> reloadedDoc = Poppler::Document::load(localPath, ownerBytes, QByteArray());
+
+    if ((reloadedDoc == nullptr || reloadedDoc->isLocked() == true || reloadedDoc->okToCopy() == false) && m_cachedUserPassword.isEmpty() == false) {
+        reloadedDoc = Poppler::Document::load(localPath, ownerBytes, m_cachedUserPassword.toUtf8());
+    }
+
+    if (reloadedDoc == nullptr || reloadedDoc->isLocked() == true || reloadedDoc->okToCopy() == false) {
+        reloadedDoc = Poppler::Document::load(localPath, ownerBytes, ownerBytes);
+    }
+
+    if (reloadedDoc != nullptr && reloadedDoc->isLocked() == false && reloadedDoc->okToCopy() == true) {
+        m_pdfDocument = std::move(reloadedDoc);
+        m_totalPageNumber = m_pdfDocument->numPages();
+        updatePermissions();
+        return true;
+    }
+
+    return false;
+}
+
+void PdfDocument::updatePermissions() {
+    if (m_pdfDocument != nullptr && m_pdfDocument->isLocked() == false) {
+        bool allowed = m_pdfDocument->okToCopy();
+        qDebug() << "[Permissions] okToCopy allowed by document:" << allowed;
+        if (m_canCopy != allowed) {
+            m_canCopy = allowed;
+            emit permissionsChanged();
+        }
+    }
 }
 
 QImage PdfDocument::getPageImageData(int pageIndex) {
-    if (m_pdfDocument == nullptr || pageIndex < 0 || pageIndex >= m_totalPageNumber) {
+    if (m_pdfDocument == nullptr || m_pdfDocument->isLocked() == true || pageIndex < 0 || pageIndex >= m_totalPageNumber) {
         return QImage();
     }
 
@@ -45,7 +122,7 @@ QImage PdfDocument::getPageImageData(int pageIndex) {
 
 QList<TextRectItem> PdfDocument::getPageTextRects(int pageIndex) {
     QList<TextRectItem> rectsList;
-    if (m_pdfDocument == nullptr || pageIndex < 0 || pageIndex >= m_totalPageNumber) {
+    if (m_pdfDocument == nullptr || m_pdfDocument->isLocked() == true || pageIndex < 0 || pageIndex >= m_totalPageNumber) {
         return rectsList;
     }
 
@@ -106,7 +183,7 @@ QList<TextRectItem> PdfDocument::getPageTextRects(int pageIndex) {
 }
 
 QSizeF PdfDocument::getPageSizePoints(int pageIndex) {
-    if (m_pdfDocument == nullptr || pageIndex < 0 || pageIndex >= m_totalPageNumber) {
+    if (m_pdfDocument == nullptr || m_pdfDocument->isLocked() == true || pageIndex < 0 || pageIndex >= m_totalPageNumber) {
         return QSizeF(0, 0);
     }
     std::unique_ptr<Poppler::Page> pdfPage(m_pdfDocument->page(pageIndex));
@@ -117,7 +194,7 @@ QSizeF PdfDocument::getPageSizePoints(int pageIndex) {
 }
 
 const QVector<TocItem>& PdfDocument::getTableOfContents() {
-    if (m_tableOfContents.isEmpty() == true && m_pdfDocument != nullptr) {
+    if (m_tableOfContents.isEmpty() == true && m_pdfDocument != nullptr && m_pdfDocument->isLocked() == false) {
         parsePopplerToc(m_pdfDocument->outline(), m_tableOfContents, 0);
     }
     return m_tableOfContents;
