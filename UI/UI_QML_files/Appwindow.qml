@@ -16,17 +16,30 @@ ApplicationWindow {
            ? documentManager.activeDocument.title
            : "ShokaReader"
 
-    Component.onCompleted: {
-            if (documentManager.activeDocument !== null) {
-                stackView.replace("Readerscreen.qml",StackView.Immediate);
-            }
+    property var pendingRestoreState: null
+
+    onClosing: {
+        if (stackView.currentItem !== null && stackView.currentItem.objectName === "readerScreen" && documentManager.activeDocument !== null) {
+            libraryManager.updateSessionState(
+                documentManager.activeDocument,
+                stackView.currentItem.currentPage,
+                stackView.currentItem.currentZoom,
+                stackView.currentItem.pageRotation
+            );
         }
+    }
+
+    Component.onCompleted: {
+        if (documentManager.activeDocument !== null) {
+            stackView.replace("Readerscreen.qml", StackView.Immediate);
+        }
+    }
 
     RowLayout {
         anchors.fill: parent
         spacing: 0
 
-        //Global Activity Bar
+        // Global Activity Bar
         Rectangle {
             id: activityBar
             Layout.preferredWidth: 50
@@ -42,43 +55,96 @@ ApplicationWindow {
                     source: "../../assets/images/HomeIcon.png"
                     toolTipText: "Home"
                     onClicked: {
-                        if(stackView.currentItem !== null && stackView.currentItem.objectName !== "homeScreen"){
-                            stackView.replace("Homescreen.qml",StackView.Immediate);
+                        if (stackView.currentItem !== null && stackView.currentItem.objectName !== "homeScreen") {
+                            if (stackView.currentItem.objectName === "readerScreen" && documentManager.activeDocument !== null) {
+                                libraryManager.updateSessionState(
+                                    documentManager.activeDocument,
+                                    stackView.currentItem.currentPage,
+                                    stackView.currentItem.currentZoom,
+                                    stackView.currentItem.pageRotation
+                                );
+                            }
+                            stackView.replace("Homescreen.qml", StackView.Immediate);
                             documentManager.releaseDocument();
                         }
                     }
                 }
 
-                C_ToolbarButton{
-                    id:lastReadButton
+                C_ToolbarButton {
+                    id: lastReadButton
                     source: "../../assets/images/LastRead.png"
                     toolTipText: "Last Read File"
+                    onClicked: {
+                        let lastDoc = libraryManager.lastReadDocument;
+                        if (!lastDoc || !lastDoc.filePath || lastDoc.filePath === "") {
+                            errorDialogText.text = "No recently read documents found.";
+                            errorDialogWindow.open();
+                            return;
+                        }
+
+                        if (!libraryManager.checkFileExists(lastDoc.filePath)) {
+                            missingFileDialog.targetFingerprint = lastDoc.fingerprint;
+                            missingFileDialog.targetFilePath = lastDoc.filePath;
+                            missingFileDialog.open();
+                            return;
+                        }
+
+                        // Save the currently active document before switching
+                        if (stackView.currentItem !== null && stackView.currentItem.objectName === "readerScreen" && documentManager.activeDocument !== null) {
+                            libraryManager.updateSessionState(
+                                documentManager.activeDocument,
+                                stackView.currentItem.currentPage,
+                                stackView.currentItem.currentZoom,
+                                stackView.currentItem.pageRotation
+                            );
+                        }
+
+                        pendingRestoreState = {
+                            page: lastDoc.currentPage,
+                            zoom: lastDoc.zoom,
+                            rotation: lastDoc.rotation
+                        };
+
+                        let fileUrl = Qt.resolvedUrl("file:///" + lastDoc.filePath);
+                        documentManager.openDocument(fileUrl);
+                    }
                 }
 
-                C_ToolbarButton{
-                    id:filesButton
+                C_ToolbarButton {
+                    id: filesButton
                     source: "../../assets/images/Files.png"
                     shortcut: "Ctrl+O"
-                    onClicked: fileOpenDialog.open()
+                    onClicked: {
+                        if (stackView.currentItem !== null && stackView.currentItem.objectName === "readerScreen" && documentManager.activeDocument !== null) {
+                            libraryManager.updateSessionState(
+                                documentManager.activeDocument,
+                                stackView.currentItem.currentPage,
+                                stackView.currentItem.currentZoom,
+                                stackView.currentItem.pageRotation
+                            );
+                        }
+                        pendingRestoreState = null;
+                        fileOpenDialog.open();
+                    }
                     toolTipText: "Open File (Ctrl+O)"
                 }
 
-                C_ToolbarButton{
-                    id:activelyReadingButton
+                C_ToolbarButton {
+                    id: activelyReadingButton
                     source: "../../assets/images/ActiveReading.png"
                     toolTipText: "Actively Reading"
                 }
 
-                // Spacer item to push all buttons to the top and absorb remaining space when in Homescreen
-                Item{
+                // Spacer item to push buttons up when in Homescreen
+                Item {
                     visible: !(stackView.currentItem !== null && stackView.currentItem.objectName === "readerScreen")
                     Layout.fillHeight: true
                 }
 
-                C_ToolbarButton{
-                    id:searchButton
+                C_ToolbarButton {
+                    id: searchButton
                     source: "../../assets/images/SearchIcon.png"
-                    toolTipText: "Search Document(Ctrl + F)"
+                    toolTipText: "Search Document (Ctrl + F)"
                     shortcut: "Ctrl+F"
                     visible: stackView.currentItem !== null && (stackView.currentItem.objectName === "readerScreen"
                              || stackView.currentItem.objectName === "activelyReading")
@@ -94,19 +160,19 @@ ApplicationWindow {
                     }
                 }
 
-                //ReaderScreen specific buttons
-                ColumnLayout{
+                // ReaderScreen specific buttons
+                ColumnLayout {
                     spacing: 0
                     visible: stackView.currentItem !== null && stackView.currentItem.objectName === "readerScreen"
 
-                    C_ToolbarButton{
-                        id:bookMarkButton
+                    C_ToolbarButton {
+                        id: bookMarkButton
                         source: "../../assets/images/Bookmarks.png"
                         toolTipText: "Bookmarks"
                     }
 
-                    C_ToolbarButton{
-                        id:tableOfContentsButton
+                    C_ToolbarButton {
+                        id: tableOfContentsButton
                         source: "../../assets/images/Table_of_contents.png"
                         toolTipText: "Table of Contents"
                         onClicked: {
@@ -119,58 +185,57 @@ ApplicationWindow {
                         }
                     }
 
-                    C_ToolbarButton{
-                        id:zoomInButton
+                    C_ToolbarButton {
+                        id: zoomInButton
                         source: "../../assets/images/ZoomIn.png"
                         shortcut: "Ctrl + Shift + ="
-                        toolTipText: "Zoom In(Ctrl + Shift + =)"
-                        onClicked:{
+                        toolTipText: "Zoom In (Ctrl + Shift + =)"
+                        onClicked: {
                             if (stackView.currentItem !== null && stackView.currentItem.objectName === "readerScreen")
                                 stackView.currentItem.zoomIn();
                         }
                     }
 
-                    C_ToolbarButton{
-                        id:zoomOutButton
+                    C_ToolbarButton {
+                        id: zoomOutButton
                         source: "../../assets/images/ZoomOut.png"
                         shortcut: "Ctrl + Shift + -"
-                        toolTipText: "Zoom Out(Ctrl + Shift + -)"
-                        onClicked:{
+                        toolTipText: "Zoom Out (Ctrl + Shift + -)"
+                        onClicked: {
                             if (stackView.currentItem !== null && stackView.currentItem.objectName === "readerScreen")
                                 stackView.currentItem.zoomOut();
                         }
                     }
 
-                    C_ToolbarButton{
-                        id:rotateLeftButton
+                    C_ToolbarButton {
+                        id: rotateLeftButton
                         source: "../../assets/images/RotateLeft.png"
                         shortcut: "Ctrl + L"
-                        toolTipText: "Rotate Left(Ctrl + L)"
+                        toolTipText: "Rotate Left (Ctrl + L)"
                         onClicked: {
                             if (stackView.currentItem !== null && stackView.currentItem.objectName === "readerScreen")
                                 stackView.currentItem.rotateLeft();
                         }
                     }
 
-                    C_ToolbarButton{
-                        id:rotateRightButton
+                    C_ToolbarButton {
+                        id: rotateRightButton
                         source: "../../assets/images/RotateRight.png"
                         shortcut: "Ctrl + R"
-                        toolTipText: "Rotate Right(Ctrl + R)"
-                        onClicked:{
+                        toolTipText: "Rotate Right (Ctrl + R)"
+                        onClicked: {
                             if (stackView.currentItem !== null && stackView.currentItem.objectName === "readerScreen")
                                 stackView.currentItem.rotateRight();
                         }
                     }
 
-                    C_ToolbarButton{
-                        id:ttsButton
+                    C_ToolbarButton {
+                        id: ttsButton
                         source: "../../assets/images/TTSImage.png"
                         toolTipText: "TTS"
                     }
 
-                    // Spacer item to push all buttons to the top and absorb remaining space when in Readerscreen
-                    Item{
+                    Item {
                         Layout.fillHeight: true
                     }
 
@@ -181,11 +246,10 @@ ApplicationWindow {
                         reader: stackView.currentItem
                     }
                 }
-
             }
         }
 
-        //Central Dynamic Workspace (Managed by StackView)
+        // Central Workspace
         Item {
             Layout.fillWidth: true
             Layout.fillHeight: true
@@ -203,8 +267,6 @@ ApplicationWindow {
         title: "Select EPUB or PDF File"
         nameFilters: ["Documents (*.pdf *.epub)", "All Files (*.*)"]
         onAccepted: {
-            //TODO: remove console.log in final product
-            console.log("Selected file: " + selectedFile);
             documentManager.openDocument(selectedFile);
         }
     }
@@ -214,9 +276,29 @@ ApplicationWindow {
 
         function onActiveDocumentChanged() {
             if (documentManager.activeDocument === null) return;
-            //TODO: remove the console.log in final prduct
-            console.log("[QML] Backend confirmed load success for: " + documentManager.activeDocument.fileUrl);
-            stackView.replace("Readerscreen.qml",StackView.Immediate);
+
+            libraryManager.recordDocumentOpened(documentManager.activeDocument);
+
+            let targetPage = 1;
+            let targetZoom = 1.0;
+            let targetRotation = 0.0;
+
+            if (pendingRestoreState) {
+                targetPage = pendingRestoreState.page || 1;
+                targetZoom = pendingRestoreState.zoom || 1.0;
+                targetRotation = pendingRestoreState.rotation || 0.0;
+                pendingRestoreState = null;
+            }
+
+            let reader = stackView.replace("Readerscreen.qml", {
+                currentPage: targetPage,
+                currentZoom: targetZoom,
+                pageRotation: targetRotation
+            }, StackView.Immediate);
+
+            if (reader && targetPage > 1) {
+                reader.jumpToPage(targetPage);
+            }
         }
 
         function onDocumentLocked(fileName) {
@@ -325,6 +407,7 @@ ApplicationWindow {
                 text: "Cancel"
                 onClicked: {
                     passwordErrorTimer.stop();
+                    pendingRestoreState = null;
                     documentManager.cancelPendingDocument();
                     passwordDialog.close();
                 }
@@ -338,6 +421,40 @@ ApplicationWindow {
                     } else {
                         passwordDialog.showPasswordError("Incorrect password. Please try again.");
                     }
+                }
+            }
+        }
+    }
+
+    Dialog {
+        id: missingFileDialog
+        title: "File Not Found"
+        anchors.centerIn: parent
+        modal: true
+
+        property string targetFingerprint: ""
+        property string targetFilePath: ""
+
+        contentItem: ColumnLayout {
+            spacing: 10
+            Label {
+                text: "The document cannot be found at:\n\"" + missingFileDialog.targetFilePath + "\"\n\nWould you like to remove this document from your library history?"
+                wrapMode: Text.WordWrap
+                Layout.maximumWidth: 360
+            }
+        }
+
+        footer: RowLayout {
+            Item { Layout.fillWidth: true }
+            Button {
+                text: "Cancel"
+                onClicked: missingFileDialog.close()
+            }
+            Button {
+                text: "Remove"
+                onClicked: {
+                    libraryManager.removeDocumentRecord(missingFileDialog.targetFingerprint);
+                    missingFileDialog.close();
                 }
             }
         }

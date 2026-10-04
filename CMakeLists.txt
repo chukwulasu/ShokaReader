@@ -30,6 +30,8 @@ qt_add_executable(ShokaReader
     ./Libraries/DocumentManager/DocumentManager.cpp
     ./Libraries/DocumentManager/DocumentPageImageProvider.h
     ./Libraries/DocumentManager/DocumentPageImageProvider.cpp
+    ./Libraries/LibraryManager/LibraryManager.h
+    ./Libraries/LibraryManager/LibraryManager.cpp
     ${RESOURCE_FILES}
     )
 
