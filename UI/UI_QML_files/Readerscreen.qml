@@ -14,6 +14,7 @@ Rectangle {
     property real pageRotation: 0
     property bool isTableOfContentsVisible: false
     property bool isSearchSidebarVisible: false
+    property bool isBookmarkSidebarVisible: false
     property string searchPhrase: ""
     property bool searchMatchCase: false
     property bool searchMatchWholeWord: false
@@ -236,7 +237,6 @@ Rectangle {
         clipboardBridge.text = textToCopy;
         clipboardBridge.selectAll();
         clipboardBridge.copy();
-        console.log("[Clipboard] Copied formatted text with alignment and font sizes preserved.");
     }
 
     focus: true
@@ -247,13 +247,19 @@ Rectangle {
     }
 
     onIsTableOfContentsVisibleChanged: {
-        if (!isTableOfContentsVisible && !isSearchSidebarVisible) {
+        if (!isTableOfContentsVisible && !isSearchSidebarVisible && !isBookmarkSidebarVisible) {
             forceActiveFocus();
         }
     }
 
     onIsSearchSidebarVisibleChanged: {
-        if (!isSearchSidebarVisible && !isTableOfContentsVisible) {
+        if (!isSearchSidebarVisible && !isTableOfContentsVisible && !isBookmarkSidebarVisible) {
+            forceActiveFocus();
+        }
+    }
+
+    onIsBookmarkSidebarVisibleChanged: {
+        if (!isBookmarkSidebarVisible && !isTableOfContentsVisible && !isSearchSidebarVisible) {
             forceActiveFocus();
         }
     }
@@ -299,8 +305,7 @@ Rectangle {
     function rotateRight(){
         if(pageRotation === 270){
             pageRotation = 0;
-        }
-        else{
+        } else {
             pageRotation += 90;
         }
     }
@@ -308,8 +313,7 @@ Rectangle {
     function rotateLeft(){
         if(pageRotation === 0){
             pageRotation = 270;
-        }
-        else{
+        } else {
             pageRotation -= 90;
         }
     }
@@ -385,10 +389,22 @@ Rectangle {
             }
         }
 
-        // Search Sidebar (replaces TOC position when visible)
+        // Search Sidebar
         C_SearchSidebar {
             id: searchSidebar
             visible: isSearchSidebarVisible
+            reader: readerScreen
+            anchors {
+                left: parent.left
+                top: parent.top
+                bottom: parent.bottom
+            }
+        }
+
+        // Bookmark Sidebar
+        C_BookmarkSidebar {
+            id: bookmarkSidebar
+            visible: isBookmarkSidebarVisible
             reader: readerScreen
             anchors {
                 left: parent.left
@@ -402,7 +418,9 @@ Rectangle {
             anchors {
                 left: isTableOfContentsVisible
                       ? tableOfContents.right
-                      : (isSearchSidebarVisible ? searchSidebar.right : parent.left)
+                      : (isSearchSidebarVisible
+                         ? searchSidebar.right
+                         : (isBookmarkSidebarVisible ? bookmarkSidebar.right : parent.left))
                 right: parent.right
                 top: parent.top
                 bottom: parent.bottom
@@ -599,7 +617,6 @@ Rectangle {
                 property var pageSizePoints: Qt.size(0, 0)
                 property alias pageContainerRef: pageContainer
 
-                // Search highlights on this page
                 property var searchHighlights: (readerScreen.searchPhrase.length > 0 && documentManager.activeDocument)
                                                ? documentManager.activeDocument.searchPage(index, readerScreen.searchPhrase, readerScreen.searchMatchCase, readerScreen.searchMatchWholeWord)
                                                : []
@@ -637,19 +654,10 @@ Rectangle {
                     border.width: 1
 
                     function mapMouseToPdf(scenePoint) {
-                        let localPoint = pageContainer.mapFromItem(
-                            null,
-                            scenePoint.x,
-                            scenePoint.y
-                        );
-
+                        let localPoint = pageContainer.mapFromItem(null, scenePoint.x, scenePoint.y);
                         let scaleX = pageSizePoints.width / pageContainer.width;
                         let scaleY = pageSizePoints.height / pageContainer.height;
-
-                        return Qt.point(
-                            localPoint.x * scaleX,
-                            localPoint.y * scaleY
-                        );
+                        return Qt.point(localPoint.x * scaleX, localPoint.y * scaleY);
                     }
 
                     function findNearestWordIndex(pt) {
@@ -663,18 +671,13 @@ Rectangle {
                             }
                         }
 
-                        if (pt.y < textRects[0].y) {
-                            return 0;
-                        }
+                        if (pt.y < textRects[0].y) return 0;
 
                         let lastBox = textRects[textRects.length - 1];
-                        if (pt.y > lastBox.y + lastBox.height) {
-                            return textRects.length - 1;
-                        }
+                        if (pt.y > lastBox.y + lastBox.height) return textRects.length - 1;
 
                         let closestIdx = -1;
                         let minDistance = 999999;
-
                         for (let i = 0; i < textRects.length; ++i) {
                             let box = textRects[i];
                             if (pt.y >= box.y - 4 && pt.y <= box.y + box.height + 4) {
@@ -685,7 +688,6 @@ Rectangle {
                                 }
                             }
                         }
-
                         return closestIdx;
                     }
 
@@ -714,8 +716,7 @@ Rectangle {
                         let wStart = isForward ? sWord : eWord;
                         let wEnd   = isForward ? eWord : sWord;
 
-                        if (index < pStart || index > pEnd)
-                            return [];
+                        if (index < pStart || index > pEnd) return [];
 
                         let firstWord = (index === pStart) ? Math.max(0, wStart) : 0;
                         let lastWord  = (index === pEnd)   ? Math.min(textRects.length - 1, wEnd) : textRects.length - 1;

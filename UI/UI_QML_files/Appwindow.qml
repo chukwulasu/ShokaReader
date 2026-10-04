@@ -149,13 +149,14 @@ ApplicationWindow {
                     visible: stackView.currentItem !== null && (stackView.currentItem.objectName === "readerScreen"
                              || stackView.currentItem.objectName === "activelyReading")
                     onClicked: {
-                        if (stackView.currentItem !== null) {
-                            if (stackView.currentItem.objectName === "readerScreen") {
-                                if (stackView.currentItem.isTableOfContentsVisible) {
-                                    stackView.currentItem.isTableOfContentsVisible = false;
-                                }
-                                stackView.currentItem.isSearchSidebarVisible = !stackView.currentItem.isSearchSidebarVisible;
+                        if (stackView.currentItem !== null && stackView.currentItem.objectName === "readerScreen") {
+                            if (stackView.currentItem.isTableOfContentsVisible) {
+                                stackView.currentItem.isTableOfContentsVisible = false;
                             }
+                            if (stackView.currentItem.isBookmarkSidebarVisible) {
+                                stackView.currentItem.isBookmarkSidebarVisible = false;
+                            }
+                            stackView.currentItem.isSearchSidebarVisible = !stackView.currentItem.isSearchSidebarVisible;
                         }
                     }
                 }
@@ -169,6 +170,17 @@ ApplicationWindow {
                         id: bookMarkButton
                         source: "../../assets/images/Bookmarks.png"
                         toolTipText: "Bookmarks"
+                        onClicked: {
+                            if (stackView.currentItem !== null && stackView.currentItem.objectName === "readerScreen") {
+                                if (stackView.currentItem.isTableOfContentsVisible) {
+                                    stackView.currentItem.isTableOfContentsVisible = false;
+                                }
+                                if (stackView.currentItem.isSearchSidebarVisible) {
+                                    stackView.currentItem.isSearchSidebarVisible = false;
+                                }
+                                stackView.currentItem.isBookmarkSidebarVisible = !stackView.currentItem.isBookmarkSidebarVisible;
+                            }
+                        }
                     }
 
                     C_ToolbarButton {
@@ -179,6 +191,9 @@ ApplicationWindow {
                             if (stackView.currentItem !== null && stackView.currentItem.objectName === "readerScreen") {
                                 if (stackView.currentItem.isSearchSidebarVisible) {
                                     stackView.currentItem.isSearchSidebarVisible = false;
+                                }
+                                if (stackView.currentItem.isBookmarkSidebarVisible) {
+                                    stackView.currentItem.isBookmarkSidebarVisible = false;
                                 }
                                 stackView.currentItem.isTableOfContentsVisible = !stackView.currentItem.isTableOfContentsVisible;
                             }
@@ -429,6 +444,7 @@ ApplicationWindow {
     Dialog {
         id: missingFileDialog
         title: "File Not Found"
+        width: 380
         anchors.centerIn: parent
         modal: true
 
@@ -440,7 +456,7 @@ ApplicationWindow {
             Label {
                 text: "The document cannot be found at:\n\"" + missingFileDialog.targetFilePath + "\"\n\nWould you like to remove this document from your library history?"
                 wrapMode: Text.WordWrap
-                Layout.maximumWidth: 360
+                Layout.fillWidth: true
             }
         }
 

@@ -74,6 +74,9 @@ public:
     Q_INVOKABLE void removeBookmark(const QString& fingerprint, int page);
     Q_INVOKABLE void removeDocumentRecord(const QString& fingerprint);
 
+    //used for getting bookmarks for document
+    Q_INVOKABLE QString getDocumentFingerprint(DocumentBase* doc) const;
+
 signals:
     void libraryChanged();
     void requestOpenDocument(const QString& filePath, int page, qreal zoom, qreal rotation);

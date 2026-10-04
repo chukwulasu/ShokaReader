@@ -364,6 +364,13 @@ void LibraryManager::removeDocumentRecord(const QString& fingerprint) {
     }
 }
 
+QString LibraryManager::getDocumentFingerprint(DocumentBase* doc) const {
+    if (doc == nullptr) {
+        return QString();
+    }
+    return computeFingerprint(doc->getFileUrl().toLocalFile());
+}
+
 void LibraryManager::loadLibrary() {
     QFile file(m_libraryFilePath);
     if (!file.open(QIODevice::ReadOnly)) {
