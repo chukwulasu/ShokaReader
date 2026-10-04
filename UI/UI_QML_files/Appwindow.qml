@@ -204,9 +204,80 @@ ApplicationWindow {
             stackView.replace("Readerscreen.qml",StackView.Immediate);
         }
 
+        function onDocumentLocked(fileName) {
+            passwordDialog.targetFileName = fileName;
+            passwordDialog.errorMessage = "";
+            passwordTextField.text = "";
+            passwordDialog.open();
+        }
+
         function onErrorOccurred(errorMessage) {
             errorDialogText.text = errorMessage;
             errorDialogWindow.open();
+        }
+    }
+
+    Dialog {
+        id: passwordDialog
+        title: "Password Required"
+        anchors.centerIn: parent
+        modal: true
+
+        property string targetFileName: ""
+        property string errorMessage: ""
+
+        contentItem: ColumnLayout {
+            spacing: 12
+
+            Label {
+                text: "\"" + passwordDialog.targetFileName + "\" is password protected."
+            }
+
+            TextField {
+                id: passwordTextField
+                Layout.fillWidth: true
+                echoMode: TextInput.Password
+                placeholderText: "Enter Password"
+                focus: true
+                onAccepted: {
+                    if (documentManager.unlockPendingDocument(passwordTextField.text)) {
+                        passwordDialog.close();
+                    } else {
+                        passwordDialog.errorMessage = "Incorrect password. Please try again.";
+                    }
+                }
+            }
+
+            Label {
+                text: passwordDialog.errorMessage
+                color: "#FF4D4D"
+                visible: passwordDialog.errorMessage !== ""
+            }
+        }
+
+        footer: RowLayout {
+            Item {
+                Layout.fillWidth: true
+            }
+
+            Button {
+                text: "Cancel"
+                onClicked: {
+                    documentManager.cancelPendingDocument();
+                    passwordDialog.close();
+                }
+            }
+
+            Button {
+                text: "OK"
+                onClicked: {
+                    if (documentManager.unlockPendingDocument(passwordTextField.text)) {
+                        passwordDialog.close();
+                    } else {
+                        passwordDialog.errorMessage = "Incorrect password. Please try again.";
+                    }
+                }
+            }
         }
     }
 

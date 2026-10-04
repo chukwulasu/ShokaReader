@@ -10,10 +10,11 @@ class PdfDocument : public DocumentBase {
 public:
     explicit PdfDocument(QObject* parent = nullptr);
     ~PdfDocument() override;
-    bool getDocumentMetaData(const QUrl& filePath) override;
+    DocumentState getDocumentMetaData(const QUrl& filePath) override;
+    bool unlock(const QString& password) override;
     QImage getPageImageData(int pageIndex) override;
     const QVector<TocItem>& getTableOfContents() override;
-   
+
     /*
     Returns a contiguous QList of TextRectItem structs holding
     the text string and bounding box in PDF points for each word.

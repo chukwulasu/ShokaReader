@@ -7,6 +7,11 @@ DocumentBase::DocumentBase(QObject* parent)
 
 DocumentBase::~DocumentBase() = default;
 
+bool DocumentBase::unlock(const QString &password) {
+    Q_UNUSED(password);
+    return false;
+}
+
 const QVector<TocItem>& DocumentBase::getTableOfContents(){
     return m_tableOfContents;
 }
@@ -41,4 +46,3 @@ QVariant DocumentBase::data(const QModelIndex &index, int role) const {
 
     return QVariant();
 }
-

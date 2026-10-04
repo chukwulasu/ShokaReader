@@ -10,6 +10,12 @@
 #include <QList>
 #include <QMetaType>
 
+enum class DocumentState {
+    LoadSuccessful,
+    LoadFailed,
+    Locked
+};
+
 struct TocItem {
     Q_GADGET
 
@@ -70,7 +76,8 @@ class DocumentBase : public QAbstractListModel{
 public:
     explicit DocumentBase(QObject* parent = nullptr);
     virtual ~DocumentBase();
-    virtual bool getDocumentMetaData(const QUrl &filePath) = 0;
+    virtual DocumentState getDocumentMetaData(const QUrl &filePath) = 0;
+    virtual bool unlock(const QString &password);
     virtual QImage getPageImageData(int pageIndex) = 0;
     virtual const QVector<TocItem>& getTableOfContents();
     Q_INVOKABLE virtual QList<TextRectItem> getPageTextRects(int pageIndex) = 0;

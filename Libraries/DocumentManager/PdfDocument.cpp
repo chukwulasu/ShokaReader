@@ -8,28 +8,62 @@ PdfDocument::PdfDocument(QObject* parent)
 
 PdfDocument::~PdfDocument() = default;
 
-bool PdfDocument::getDocumentMetaData(const QUrl& filePath) {
+DocumentState PdfDocument::getDocumentMetaData(const QUrl& filePath) {
     m_fileUrl = filePath;
     QString localPath = filePath.toLocalFile();
 
     m_pdfDocument = Poppler::Document::load(localPath);
     // TODO: write code to provide dialog to unlokck locked pdf files
-    if (m_pdfDocument == nullptr || m_pdfDocument->isLocked() == true) {
+    if (m_pdfDocument == nullptr) {
         m_totalPageNumber = 0;
         m_title.clear();
-        m_pdfDocument.reset();
         m_tableOfContents.clear();
-        return false;
-    } else {
-        m_totalPageNumber = m_pdfDocument->numPages();
-        m_title = QFileInfo(localPath).completeBaseName();
-        m_tableOfContents.clear();
+        return DocumentState::LoadFailed;
     }
-    return true;
+
+    m_title = QFileInfo(localPath).completeBaseName();
+
+    if (m_pdfDocument->isLocked() == true) {
+        m_totalPageNumber = 0;
+        m_tableOfContents.clear();
+        return DocumentState::Locked;
+    }
+
+    m_totalPageNumber = m_pdfDocument->numPages();
+    m_tableOfContents.clear();
+    return DocumentState::LoadSuccessful;
+}
+
+bool PdfDocument::unlock(const QString& password) {
+    if (m_pdfDocument == nullptr || m_pdfDocument->isLocked() == false) {
+        return false;
+    }
+
+    QByteArray passBytes = password.toUtf8();
+
+    // Attempt to unlock with the provided password
+   bool var =  m_pdfDocument->unlock(passBytes, passBytes);
+
+    if (m_pdfDocument->isLocked() == true) {
+        var = m_pdfDocument->unlock(QByteArray(), passBytes);
+    }
+
+    if (m_pdfDocument->isLocked() == true) {
+        var = m_pdfDocument->unlock(passBytes, QByteArray());
+    }
+
+    // using isLocked because unlock isn't returning the right true or false value
+    if (m_pdfDocument->isLocked() == false) {
+        m_totalPageNumber = m_pdfDocument->numPages();
+        m_tableOfContents.clear();
+        return true;
+    }
+
+    return false;
 }
 
 QImage PdfDocument::getPageImageData(int pageIndex) {
-    if (m_pdfDocument == nullptr || pageIndex < 0 || pageIndex >= m_totalPageNumber) {
+    if (m_pdfDocument == nullptr || m_pdfDocument->isLocked() == true || pageIndex < 0 || pageIndex >= m_totalPageNumber) {
         return QImage();
     }
 
@@ -45,7 +79,7 @@ QImage PdfDocument::getPageImageData(int pageIndex) {
 
 QList<TextRectItem> PdfDocument::getPageTextRects(int pageIndex) {
     QList<TextRectItem> rectsList;
-    if (m_pdfDocument == nullptr || pageIndex < 0 || pageIndex >= m_totalPageNumber) {
+    if (m_pdfDocument == nullptr || m_pdfDocument->isLocked() == true || pageIndex < 0 || pageIndex >= m_totalPageNumber) {
         return rectsList;
     }
 
@@ -106,7 +140,7 @@ QList<TextRectItem> PdfDocument::getPageTextRects(int pageIndex) {
 }
 
 QSizeF PdfDocument::getPageSizePoints(int pageIndex) {
-    if (m_pdfDocument == nullptr || pageIndex < 0 || pageIndex >= m_totalPageNumber) {
+    if (m_pdfDocument == nullptr || m_pdfDocument->isLocked() == true || pageIndex < 0 || pageIndex >= m_totalPageNumber) {
         return QSizeF(0, 0);
     }
     std::unique_ptr<Poppler::Page> pdfPage(m_pdfDocument->page(pageIndex));
@@ -117,7 +151,7 @@ QSizeF PdfDocument::getPageSizePoints(int pageIndex) {
 }
 
 const QVector<TocItem>& PdfDocument::getTableOfContents() {
-    if (m_tableOfContents.isEmpty() == true && m_pdfDocument != nullptr) {
+    if (m_tableOfContents.isEmpty() == true && m_pdfDocument != nullptr && m_pdfDocument->isLocked() == false) {
         parsePopplerToc(m_pdfDocument->outline(), m_tableOfContents, 0);
     }
     return m_tableOfContents;
