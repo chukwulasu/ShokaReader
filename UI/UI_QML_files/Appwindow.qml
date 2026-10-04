@@ -17,6 +17,7 @@ ApplicationWindow {
            : "ShokaReader"
 
     property var pendingRestoreState: null
+    property bool pendingFavoriteOnOpen: false
 
     function openDocumentWithSavedState(filePath, page, zoom, rotation, fingerprint) {
         if (!libraryManager.checkFileExists(filePath)) {
@@ -26,7 +27,6 @@ ApplicationWindow {
             return;
         }
 
-        // Save current document session before switching
         if (stackView.currentItem !== null && stackView.currentItem.objectName === "readerScreen" && documentManager.activeDocument !== null) {
             libraryManager.updateSessionState(
                 documentManager.activeDocument,
@@ -46,12 +46,15 @@ ApplicationWindow {
         documentManager.openDocument(fileUrl);
     }
 
-    // Handles open requests from child views (such as ActivelyReadingScreen and FavoritesScreen)
     Connections {
         target: stackView.currentItem
         ignoreUnknownSignals: true
         function onRequestOpenDocument(filePath, page, zoom, rotation, fingerprint) {
             root.openDocumentWithSavedState(filePath, page, zoom, rotation, fingerprint);
+        }
+        function onRequestAddFavorite() {
+            root.pendingFavoriteOnOpen = true;
+            fileOpenDialog.open();
         }
     }
 
@@ -143,6 +146,7 @@ ApplicationWindow {
                             );
                         }
                         pendingRestoreState = null;
+                        root.pendingFavoriteOnOpen = false;
                         fileOpenDialog.open();
                     }
                     toolTipText: "Open File (Ctrl+O)"
@@ -168,14 +172,35 @@ ApplicationWindow {
                     }
                 }
 
-                // Search button placed right below primary tabs
+                // 1. Global Favorites Screen Button
+                C_ToolbarButton {
+                    id: favoritesNavButton
+                    source: "../../assets/images/favoriteButton.png"
+                    toolTipText: "Open Favorites"
+                    onClicked: {
+                        if (stackView.currentItem !== null && stackView.currentItem.objectName !== "favoritesScreen") {
+                            if (stackView.currentItem.objectName === "readerScreen" && documentManager.activeDocument !== null) {
+                                libraryManager.updateSessionState(
+                                    documentManager.activeDocument,
+                                    stackView.currentItem.currentPage,
+                                    stackView.currentItem.currentZoom,
+                                    stackView.currentItem.pageRotation
+                                );
+                            }
+                            stackView.replace("FavoritesScreen.qml", StackView.Immediate);
+                            documentManager.releaseDocument();
+                        }
+                    }
+                }
+
                 C_ToolbarButton {
                     id: searchButton
                     source: "../../assets/images/SearchIcon.png"
                     toolTipText: "Search (Ctrl + F)"
                     shortcut: "Ctrl+F"
                     visible: stackView.currentItem !== null && (stackView.currentItem.objectName === "readerScreen"
-                             || stackView.currentItem.objectName === "activelyReadingscreen")
+                             || stackView.currentItem.objectName === "activelyReadingscreen"
+                             || stackView.currentItem.objectName === "favoritesScreen")
                     onClicked: {
                         if (stackView.currentItem !== null) {
                             if (stackView.currentItem.objectName === "readerScreen") {
@@ -186,14 +211,14 @@ ApplicationWindow {
                                     stackView.currentItem.isBookmarkSidebarVisible = false;
                                 }
                                 stackView.currentItem.isSearchSidebarVisible = !stackView.currentItem.isSearchSidebarVisible;
-                            } else if (stackView.currentItem.objectName === "activelyReadingscreen") {
+                            } else if (stackView.currentItem.objectName === "activelyReadingscreen" || stackView.currentItem.objectName === "favoritesScreen") {
                                 stackView.currentItem.isSearchBarVisible = !stackView.currentItem.isSearchBarVisible;
                             }
                         }
                     }
                 }
 
-                // Spacer item to absorb remaining space when not in readerScreen
+                // Spacer item to absorb remaining vertical space when not in readerScreen
                 Item {
                     visible: !(stackView.currentItem !== null && stackView.currentItem.objectName === "readerScreen")
                     Layout.fillHeight: true
@@ -203,6 +228,23 @@ ApplicationWindow {
                 ColumnLayout {
                     spacing: 0
                     visible: stackView.currentItem !== null && stackView.currentItem.objectName === "readerScreen"
+
+                    // 2. ReaderScreen Favorite Toggle Button
+                    C_ToolbarButton {
+                        id: readerFavoriteToggleButton
+                        property bool isDocFav: {
+                            let _ = libraryManager.favoritesList; // Re-evaluates automatically on changes
+                            return documentManager.activeDocument ? libraryManager.isDocumentFavorite(documentManager.activeDocument) : false;
+                        }
+                        source: isDocFav ? "../../assets/images/Favorite_filled.png" : "../../assets/images/Favorite.png"
+                        toolTipText: isDocFav ? "Remove from Favorites" : "Add to Favorites"
+                        onClicked: {
+                            if (documentManager.activeDocument !== null) {
+                                let fp = libraryManager.getDocumentFingerprint(documentManager.activeDocument);
+                                libraryManager.toggleFavorite(fp);
+                            }
+                        }
+                    }
 
                     C_ToolbarButton {
                         id: bookMarkButton
@@ -331,6 +373,14 @@ ApplicationWindow {
             if (documentManager.activeDocument === null) return;
 
             libraryManager.recordDocumentOpened(documentManager.activeDocument);
+
+            if (root.pendingFavoriteOnOpen) {
+                let fp = libraryManager.getDocumentFingerprint(documentManager.activeDocument);
+                if (!libraryManager.isFavorite(fp)) {
+                    libraryManager.toggleFavorite(fp);
+                }
+                root.pendingFavoriteOnOpen = false;
+            }
 
             let targetPage = 1;
             let targetZoom = 1.0;
@@ -461,6 +511,7 @@ ApplicationWindow {
                 onClicked: {
                     passwordErrorTimer.stop();
                     pendingRestoreState = null;
+                    root.pendingFavoriteOnOpen = false;
                     documentManager.cancelPendingDocument();
                     passwordDialog.close();
                 }

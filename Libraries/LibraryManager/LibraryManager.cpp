@@ -371,6 +371,21 @@ QString LibraryManager::getDocumentFingerprint(DocumentBase* doc) const {
     return computeFingerprint(doc->getFileUrl().toLocalFile());
 }
 
+bool LibraryManager::isFavorite(const QString& fingerprint) const {
+    if (fingerprint.isEmpty() || !m_records.contains(fingerprint)) {
+        return false;
+    }
+    return m_records[fingerprint].isFavorite;
+}
+
+bool LibraryManager::isDocumentFavorite(DocumentBase* doc) const {
+    if (doc == nullptr) {
+        return false;
+    }
+    QString fp = computeFingerprint(doc->getFileUrl().toLocalFile());
+    return isFavorite(fp);
+}
+
 void LibraryManager::loadLibrary() {
     QFile file(m_libraryFilePath);
     if (!file.open(QIODevice::ReadOnly)) {

@@ -76,6 +76,8 @@ public:
 
     //used for getting bookmarks for document
     Q_INVOKABLE QString getDocumentFingerprint(DocumentBase* doc) const;
+    Q_INVOKABLE bool isFavorite(const QString& fingerprint) const;
+    Q_INVOKABLE bool isDocumentFavorite(DocumentBase* doc) const;
 
 signals:
     void libraryChanged();

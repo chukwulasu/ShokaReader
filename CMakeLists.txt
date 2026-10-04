@@ -42,6 +42,7 @@ qt_add_qml_module(ShokaReader
         UI/UI_QML_files/Homescreen.qml
         UI/UI_QML_files/Readerscreen.qml
         UI/UI_QML_files/ActivelyReadingScreen.qml
+        UI/UI_QML_files/FavoritesScreen.qml
         UI/UI_QML_files/Custom_Items/C_PageNumberViewer.qml
         UI/UI_QML_files/Custom_Items/C_ToolbarButton.qml
         UI/UI_QML_files/Custom_Items/C_TableOfContentsSidebar.qml
@@ -66,6 +67,9 @@ qt_add_qml_module(ShokaReader
     UI/assets/images/RotateLeft.png
     UI/assets/images/RotateRight.png
     UI/assets/images/TTSImage.png
+    UI/assets/images/Favorite.png
+    UI/assets/images/Favorite_filled.png
+    UI/assets/images/favoriteButton.png
 )
 
 # Qt for iOS sets MACOSX_BUNDLE_GUI_IDENTIFIER automatically since Qt 6.1.

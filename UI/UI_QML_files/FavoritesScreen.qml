@@ -3,11 +3,12 @@ import QtQuick.Controls.Basic
 import QtQuick.Layouts
 
 Rectangle {
-    id: activeReadingRoot
-    objectName: "activelyReadingscreen"
+    id: favoritesRoot
+    objectName: "favoritesScreen"
     color: "#181818"
 
     signal requestOpenDocument(string filePath, int page, real zoom, real rotation, string fingerprint)
+    signal requestAddFavorite()
 
     property bool isGridView: true
     property bool isSearchBarVisible: false
@@ -19,9 +20,8 @@ Rectangle {
         }
     }
 
-    // Filtered list based on search query
     property var displayedList: {
-        let raw = (typeof libraryManager !== "undefined" && libraryManager) ? libraryManager.activelyReadingList : [];
+        let raw = (typeof libraryManager !== "undefined" && libraryManager) ? libraryManager.favoritesList : [];
         if (!raw) return [];
         if (!searchQuery || searchQuery.trim() === "") {
             return raw;
@@ -42,14 +42,14 @@ Rectangle {
             spacing: 12
 
             Text {
-                text: "Actively Reading"
+                text: "Favorites"
                 font.bold: true
                 font.pixelSize: 22
                 color: "#FFFFFF"
             }
 
             Text {
-                text: "(" + (activeReadingRoot.displayedList ? activeReadingRoot.displayedList.length : 0) + ")"
+                text: "(" + (favoritesRoot.displayedList ? favoritesRoot.displayedList.length : 0) + ")"
                 font.pixelSize: 14
                 color: "#888888"
                 Layout.alignment: Qt.AlignBaseline
@@ -59,7 +59,7 @@ Rectangle {
 
             // Inline Search Bar
             Rectangle {
-                visible: activeReadingRoot.isSearchBarVisible
+                visible: favoritesRoot.isSearchBarVisible
                 Layout.preferredWidth: 240
                 Layout.preferredHeight: 32
                 color: "#242424"
@@ -83,18 +83,18 @@ Rectangle {
                         id: searchInput
                         Layout.fillWidth: true
                         Layout.fillHeight: true
-                        placeholderText: "Filter books..."
+                        placeholderText: "Filter favorites..."
                         placeholderTextColor: "#666666"
                         color: "#FFFFFF"
                         font.pixelSize: 12
                         verticalAlignment: TextInput.AlignVCenter
                         background: Item {}
 
-                        onTextChanged: activeReadingRoot.searchQuery = text
+                        onTextChanged: favoritesRoot.searchQuery = text
 
                         Keys.onEscapePressed: (event) => {
-                            activeReadingRoot.isSearchBarVisible = false;
-                            activeReadingRoot.searchQuery = "";
+                            favoritesRoot.isSearchBarVisible = false;
+                            favoritesRoot.searchQuery = "";
                             text = "";
                             event.accepted = true;
                         }
@@ -110,7 +110,7 @@ Rectangle {
                             anchors.margins: -4
                             onClicked: {
                                 searchInput.text = "";
-                                activeReadingRoot.searchQuery = "";
+                                favoritesRoot.searchQuery = "";
                             }
                         }
                     }
@@ -126,8 +126,8 @@ Rectangle {
                     width: 32
                     height: 32
                     checkable: true
-                    checked: activeReadingRoot.isGridView
-                    onClicked: activeReadingRoot.isGridView = true
+                    checked: favoritesRoot.isGridView
+                    onClicked: favoritesRoot.isGridView = true
                     ToolTip.visible: hovered
                     ToolTip.text: "Grid View"
 
@@ -149,8 +149,8 @@ Rectangle {
                     width: 32
                     height: 32
                     checkable: true
-                    checked: !activeReadingRoot.isGridView
-                    onClicked: activeReadingRoot.isGridView = false
+                    checked: !favoritesRoot.isGridView
+                    onClicked: favoritesRoot.isGridView = false
                     ToolTip.visible: hovered
                     ToolTip.text: "List View"
 
@@ -173,14 +173,14 @@ Rectangle {
         Item {
             Layout.fillWidth: true
             Layout.fillHeight: true
-            visible: activeReadingRoot.displayedList.length === 0
+            visible: favoritesRoot.displayedList.length === 0
 
             Column {
                 anchors.centerIn: parent
-                spacing: 12
+                spacing: 14
 
                 Text {
-                    text: activeReadingRoot.searchQuery.length > 0 ? "No matching books found" : "No books currently being read"
+                    text: favoritesRoot.searchQuery.length > 0 ? "No matching favorites found" : "No favorites added yet"
                     font.pixelSize: 16
                     font.bold: true
                     color: "#CCCCCC"
@@ -188,10 +188,31 @@ Rectangle {
                 }
 
                 Text {
-                    text: activeReadingRoot.searchQuery.length > 0 ? "Try clearing your search filter." : "Books you navigate past page 1 will automatically appear here."
+                    text: favoritesRoot.searchQuery.length > 0 ? "Try clearing your search filter." : "Click the favorite button while reading to keep books here."
                     font.pixelSize: 13
                     color: "#777777"
                     anchors.horizontalCenter: parent.horizontalCenter
+                }
+
+                Button {
+                    text: "Add Document to Favorites"
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    visible: favoritesRoot.searchQuery.length === 0
+                    contentItem: Text {
+                        text: parent.text
+                        color: "#FFFFFF"
+                        font.pixelSize: 12
+                        font.bold: true
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
+                    }
+                    background: Rectangle {
+                        color: parent.hovered ? "#2563EB" : "#1D4ED8"
+                        radius: 4
+                        implicitWidth: 190
+                        implicitHeight: 34
+                    }
+                    onClicked: favoritesRoot.requestAddFavorite()
                 }
             }
         }
@@ -204,7 +225,7 @@ Rectangle {
             contentWidth: width
             contentHeight: gridFlow.height
             clip: true
-            visible: activeReadingRoot.isGridView && activeReadingRoot.displayedList.length > 0
+            visible: favoritesRoot.isGridView && favoritesRoot.displayedList.length > 0
 
             ScrollBar.vertical: ScrollBar {
                 policy: ScrollBar.AsNeeded
@@ -216,7 +237,7 @@ Rectangle {
                 spacing: 24
 
                 Repeater {
-                    model: activeReadingRoot.displayedList
+                    model: favoritesRoot.displayedList
 
                     delegate: Rectangle {
                         width: 190
@@ -232,7 +253,7 @@ Rectangle {
                             hoverEnabled: true
                             cursorShape: Qt.PointingHandCursor
                             onClicked: {
-                                activeReadingRoot.requestOpenDocument(
+                                favoritesRoot.requestOpenDocument(
                                     modelData.filePath,
                                     modelData.currentPage,
                                     modelData.zoom,
@@ -247,7 +268,6 @@ Rectangle {
                             anchors.margins: 10
                             spacing: 8
 
-                            // Thumbnail Cover
                             Rectangle {
                                 Layout.fillWidth: true
                                 Layout.preferredHeight: 210
@@ -270,37 +290,7 @@ Rectangle {
                                     }
                                 }
 
-                                // Favorite Toggle Button (Top-Left of Cover)
-                                Rectangle {
-                                    anchors.top: parent.top
-                                    anchors.left: parent.left
-                                    anchors.margins: 6
-                                    width: 26
-                                    height: 26
-                                    radius: 13
-                                    color: favBtnHover.containsMouse ? "#40FFFFFF" : "#80000000"
-
-                                    Image {
-                                        anchors.centerIn: parent
-                                        width: 15
-                                        height: 15
-                                        source: modelData.isFavorite
-                                                ? "../../assets/images/Favorite_filled.png"
-                                                : "../../assets/images/Favorite.png"
-                                        fillMode: Image.PreserveAspectFit
-                                    }
-
-                                    MouseArea {
-                                        id: favBtnHover
-                                        anchors.fill: parent
-                                        hoverEnabled: true
-                                        ToolTip.visible: containsMouse
-                                        ToolTip.text: modelData.isFavorite ? "Remove from Favorites" : "Add to Favorites"
-                                        onClicked: libraryManager.toggleFavorite(modelData.fingerprint)
-                                    }
-                                }
-
-                                // Mark Finished Button (Top-Right of Cover)
+                                // Remove from Favorites button on card
                                 Rectangle {
                                     anchors.top: parent.top
                                     anchors.right: parent.right
@@ -308,29 +298,26 @@ Rectangle {
                                     width: 26
                                     height: 26
                                     radius: 13
-                                    color: finishBtnHover.containsMouse ? "#DC2626" : "#80000000"
-                                    visible: cardHover.containsMouse
+                                    color: favBtnHover.containsMouse ? "#DC2626" : "#A0000000"
 
                                     Text {
                                         anchors.centerIn: parent
-                                        text: "✓"
+                                        text: "✕"
                                         color: "#FFFFFF"
-                                        font.bold: true
-                                        font.pixelSize: 12
+                                        font.pixelSize: 11
                                     }
 
                                     MouseArea {
-                                        id: finishBtnHover
+                                        id: favBtnHover
                                         anchors.fill: parent
                                         hoverEnabled: true
                                         ToolTip.visible: containsMouse
-                                        ToolTip.text: "Mark as Finished"
-                                        onClicked: libraryManager.markAsFinished(modelData.fingerprint)
+                                        ToolTip.text: "Remove from Favorites"
+                                        onClicked: libraryManager.toggleFavorite(modelData.fingerprint)
                                     }
                                 }
                             }
 
-                            // Book Title
                             Text {
                                 Layout.fillWidth: true
                                 text: modelData.title || ""
@@ -341,7 +328,6 @@ Rectangle {
                                 maximumLineCount: 1
                             }
 
-                            // Progress Bar
                             ProgressBar {
                                 Layout.fillWidth: true
                                 Layout.preferredHeight: 4
@@ -363,7 +349,6 @@ Rectangle {
                                 }
                             }
 
-                            // Page Counter
                             RowLayout {
                                 Layout.fillWidth: true
                                 Text {
@@ -392,8 +377,8 @@ Rectangle {
             Layout.fillHeight: true
             clip: true
             spacing: 8
-            visible: !activeReadingRoot.isGridView && activeReadingRoot.displayedList.length > 0
-            model: activeReadingRoot.displayedList
+            visible: !favoritesRoot.isGridView && favoritesRoot.displayedList.length > 0
+            model: favoritesRoot.displayedList
 
             ScrollBar.vertical: ScrollBar {
                 policy: ScrollBar.AsNeeded
@@ -413,7 +398,7 @@ Rectangle {
                     hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
                     onClicked: {
-                        activeReadingRoot.requestOpenDocument(
+                        favoritesRoot.requestOpenDocument(
                             modelData.filePath,
                             modelData.currentPage,
                             modelData.zoom,
@@ -428,7 +413,6 @@ Rectangle {
                     anchors.margins: 10
                     spacing: 16
 
-                    // Mini Thumbnail
                     Rectangle {
                         Layout.preferredWidth: 40
                         Layout.preferredHeight: 52
@@ -444,7 +428,6 @@ Rectangle {
                         }
                     }
 
-                    // Metadata
                     ColumnLayout {
                         Layout.fillWidth: true
                         spacing: 4
@@ -492,13 +475,11 @@ Rectangle {
                         }
                     }
 
-                    // Favorite Button (PNG Toggle)
                     Button {
                         id: listFavBtn
                         Layout.preferredHeight: 28
-                        Layout.preferredWidth: 32
-                        ToolTip.visible: hovered
-                        ToolTip.text: modelData.isFavorite ? "Remove from Favorites" : "Add to Favorites"
+                        Layout.preferredWidth: 110
+                        text: "Remove Favorite"
                         onClicked: libraryManager.toggleFavorite(modelData.fingerprint)
 
                         background: Rectangle {
@@ -506,32 +487,8 @@ Rectangle {
                             color: listFavBtn.hovered ? "#333333" : "#262626"
                             border.color: "#3E3E3E"
                         }
-                        contentItem: Image {
-                            anchors.centerIn: parent
-                            width: 15
-                            height: 15
-                            source: modelData.isFavorite
-                                    ? "../../assets/images/Favorite_filled.png"
-                                    : "../../assets/images/Favorite.png"
-                            fillMode: Image.PreserveAspectFit
-                        }
-                    }
-
-                    // Mark Finished Button
-                    Button {
-                        id: listFinishBtn
-                        Layout.preferredHeight: 28
-                        Layout.preferredWidth: 110
-                        text: "Mark Finished"
-                        onClicked: libraryManager.markAsFinished(modelData.fingerprint)
-
-                        background: Rectangle {
-                            radius: 4
-                            color: listFinishBtn.hovered ? "#333333" : "#262626"
-                            border.color: "#3E3E3E"
-                        }
                         contentItem: Text {
-                            text: listFinishBtn.text
+                            text: listFavBtn.text
                             font.pixelSize: 11
                             color: "#CCCCCC"
                             horizontalAlignment: Text.AlignHCenter
