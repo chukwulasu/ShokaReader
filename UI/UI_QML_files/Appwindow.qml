@@ -18,6 +18,43 @@ ApplicationWindow {
 
     property var pendingRestoreState: null
 
+    function openDocumentWithSavedState(filePath, page, zoom, rotation, fingerprint) {
+        if (!libraryManager.checkFileExists(filePath)) {
+            missingFileDialog.targetFingerprint = fingerprint;
+            missingFileDialog.targetFilePath = filePath;
+            missingFileDialog.open();
+            return;
+        }
+
+        // Save current document session before switching
+        if (stackView.currentItem !== null && stackView.currentItem.objectName === "readerScreen" && documentManager.activeDocument !== null) {
+            libraryManager.updateSessionState(
+                documentManager.activeDocument,
+                stackView.currentItem.currentPage,
+                stackView.currentItem.currentZoom,
+                stackView.currentItem.pageRotation
+            );
+        }
+
+        pendingRestoreState = {
+            page: page,
+            zoom: zoom,
+            rotation: rotation
+        };
+
+        let fileUrl = Qt.resolvedUrl("file:///" + filePath);
+        documentManager.openDocument(fileUrl);
+    }
+
+    // Handles open requests from child views (such as ActivelyReadingScreen and FavoritesScreen)
+    Connections {
+        target: stackView.currentItem
+        ignoreUnknownSignals: true
+        function onRequestOpenDocument(filePath, page, zoom, rotation, fingerprint) {
+            root.openDocumentWithSavedState(filePath, page, zoom, rotation, fingerprint);
+        }
+    }
+
     onClosing: {
         if (stackView.currentItem !== null && stackView.currentItem.objectName === "readerScreen" && documentManager.activeDocument !== null) {
             libraryManager.updateSessionState(
@@ -82,31 +119,13 @@ ApplicationWindow {
                             return;
                         }
 
-                        if (!libraryManager.checkFileExists(lastDoc.filePath)) {
-                            missingFileDialog.targetFingerprint = lastDoc.fingerprint;
-                            missingFileDialog.targetFilePath = lastDoc.filePath;
-                            missingFileDialog.open();
-                            return;
-                        }
-
-                        // Save the currently active document before switching
-                        if (stackView.currentItem !== null && stackView.currentItem.objectName === "readerScreen" && documentManager.activeDocument !== null) {
-                            libraryManager.updateSessionState(
-                                documentManager.activeDocument,
-                                stackView.currentItem.currentPage,
-                                stackView.currentItem.currentZoom,
-                                stackView.currentItem.pageRotation
-                            );
-                        }
-
-                        pendingRestoreState = {
-                            page: lastDoc.currentPage,
-                            zoom: lastDoc.zoom,
-                            rotation: lastDoc.rotation
-                        };
-
-                        let fileUrl = Qt.resolvedUrl("file:///" + lastDoc.filePath);
-                        documentManager.openDocument(fileUrl);
+                        root.openDocumentWithSavedState(
+                            lastDoc.filePath,
+                            lastDoc.currentPage,
+                            lastDoc.zoom,
+                            lastDoc.rotation,
+                            lastDoc.fingerprint
+                        );
                     }
                 }
 
@@ -133,32 +152,51 @@ ApplicationWindow {
                     id: activelyReadingButton
                     source: "../../assets/images/ActiveReading.png"
                     toolTipText: "Actively Reading"
+                    onClicked: {
+                        if (stackView.currentItem !== null && stackView.currentItem.objectName !== "activelyReadingscreen") {
+                            if (stackView.currentItem.objectName === "readerScreen" && documentManager.activeDocument !== null) {
+                                libraryManager.updateSessionState(
+                                    documentManager.activeDocument,
+                                    stackView.currentItem.currentPage,
+                                    stackView.currentItem.currentZoom,
+                                    stackView.currentItem.pageRotation
+                                );
+                            }
+                            stackView.replace("ActivelyReadingScreen.qml", StackView.Immediate);
+                            documentManager.releaseDocument();
+                        }
+                    }
                 }
 
-                // Spacer item to push buttons up when in Homescreen
-                Item {
-                    visible: !(stackView.currentItem !== null && stackView.currentItem.objectName === "readerScreen")
-                    Layout.fillHeight: true
-                }
-
+                // Search button placed right below primary tabs
                 C_ToolbarButton {
                     id: searchButton
                     source: "../../assets/images/SearchIcon.png"
-                    toolTipText: "Search Document (Ctrl + F)"
+                    toolTipText: "Search (Ctrl + F)"
                     shortcut: "Ctrl+F"
                     visible: stackView.currentItem !== null && (stackView.currentItem.objectName === "readerScreen"
-                             || stackView.currentItem.objectName === "activelyReading")
+                             || stackView.currentItem.objectName === "activelyReadingscreen")
                     onClicked: {
-                        if (stackView.currentItem !== null && stackView.currentItem.objectName === "readerScreen") {
-                            if (stackView.currentItem.isTableOfContentsVisible) {
-                                stackView.currentItem.isTableOfContentsVisible = false;
+                        if (stackView.currentItem !== null) {
+                            if (stackView.currentItem.objectName === "readerScreen") {
+                                if (stackView.currentItem.isTableOfContentsVisible) {
+                                    stackView.currentItem.isTableOfContentsVisible = false;
+                                }
+                                if (stackView.currentItem.isBookmarkSidebarVisible) {
+                                    stackView.currentItem.isBookmarkSidebarVisible = false;
+                                }
+                                stackView.currentItem.isSearchSidebarVisible = !stackView.currentItem.isSearchSidebarVisible;
+                            } else if (stackView.currentItem.objectName === "activelyReadingscreen") {
+                                stackView.currentItem.isSearchBarVisible = !stackView.currentItem.isSearchBarVisible;
                             }
-                            if (stackView.currentItem.isBookmarkSidebarVisible) {
-                                stackView.currentItem.isBookmarkSidebarVisible = false;
-                            }
-                            stackView.currentItem.isSearchSidebarVisible = !stackView.currentItem.isSearchSidebarVisible;
                         }
                     }
+                }
+
+                // Spacer item to absorb remaining space when not in readerScreen
+                Item {
+                    visible: !(stackView.currentItem !== null && stackView.currentItem.objectName === "readerScreen")
+                    Layout.fillHeight: true
                 }
 
                 // ReaderScreen specific buttons
