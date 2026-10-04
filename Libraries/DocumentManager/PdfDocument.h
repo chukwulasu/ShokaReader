@@ -11,7 +11,7 @@ public:
     explicit PdfDocument(QObject* parent = nullptr);
     ~PdfDocument() override;
     DocumentState getDocumentMetaData(const QUrl& filePath) override;
-    bool unlock(const QString& password) override;
+    bool unlock(const QString& userPassword, const QString& ownerPassword = QString()) override;
     QImage getPageImageData(int pageIndex) override;
     const QVector<TocItem>& getTableOfContents() override;
 
@@ -29,6 +29,7 @@ public:
 private:
     // Recursive helper functions to parse Poppler's TOC tree
     void parsePopplerToc(const QVector<Poppler::OutlineItem>& items, QVector<TocItem>& tocVector, int currentDepth = 0);
+    void updatePermissions();
 
 private:
     std::unique_ptr<Poppler::Document> m_pdfDocument = nullptr;

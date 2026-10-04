@@ -72,12 +72,13 @@ class DocumentBase : public QAbstractListModel{
     Q_PROPERTY(int totalPageNumber READ getTotalPageNumber CONSTANT)
     Q_PROPERTY(QString title READ getTitle CONSTANT)
     Q_PROPERTY(QVector<TocItem> tableOfContents READ getTableOfContents CONSTANT)
+    Q_PROPERTY(bool canCopy READ canCopy CONSTANT)
 
 public:
     explicit DocumentBase(QObject* parent = nullptr);
     virtual ~DocumentBase();
     virtual DocumentState getDocumentMetaData(const QUrl &filePath) = 0;
-    virtual bool unlock(const QString &password);
+    virtual bool unlock(const QString &userPassword, const QString &ownerPassword = QString());
     virtual QImage getPageImageData(int pageIndex) = 0;
     virtual const QVector<TocItem>& getTableOfContents();
     Q_INVOKABLE virtual QList<TextRectItem> getPageTextRects(int pageIndex) = 0;
@@ -85,6 +86,7 @@ public:
     QUrl getFileUrl() const;
     int getTotalPageNumber() const;
     QString getTitle() const;
+    bool canCopy() const;
     int rowCount(const QModelIndex &parent = QModelIndex()) const override;
     QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const override;
 
@@ -93,4 +95,5 @@ protected:
     int m_totalPageNumber = 0;
     QString m_title = "";
     QVector<TocItem> m_tableOfContents;
+    bool m_canCopy = true;
 };

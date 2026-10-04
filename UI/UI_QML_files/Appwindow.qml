@@ -207,7 +207,9 @@ ApplicationWindow {
         function onDocumentLocked(fileName) {
             passwordDialog.targetFileName = fileName;
             passwordDialog.errorMessage = "";
-            passwordTextField.text = "";
+            passwordErrorTimer.stop();
+            userPasswordTextField.text = "";
+            ownerPasswordTextField.text = "";
             passwordDialog.open();
         }
 
@@ -226,6 +228,20 @@ ApplicationWindow {
         property string targetFileName: ""
         property string errorMessage: ""
 
+        function showPasswordError(msg) {
+            errorMessage = msg;
+            passwordErrorTimer.restart();
+        }
+
+        Timer {
+            id: passwordErrorTimer
+            interval: 1500
+            repeat: false
+            onTriggered: {
+                passwordDialog.errorMessage = "";
+            }
+        }
+
         contentItem: ColumnLayout {
             spacing: 12
 
@@ -233,17 +249,47 @@ ApplicationWindow {
                 text: "\"" + passwordDialog.targetFileName + "\" is password protected."
             }
 
+            Label {
+                text: "User Password:"
+            }
+
             TextField {
-                id: passwordTextField
+                id: userPasswordTextField
                 Layout.fillWidth: true
                 echoMode: TextInput.Password
-                placeholderText: "Enter Password"
+                placeholderText: "Enter User Password"
                 focus: true
                 onAccepted: {
-                    if (documentManager.unlockPendingDocument(passwordTextField.text)) {
+                    if (documentManager.unlockPendingDocument(userPasswordTextField.text, ownerPasswordTextField.text)) {
                         passwordDialog.close();
                     } else {
-                        passwordDialog.errorMessage = "Incorrect password. Please try again.";
+                        passwordDialog.showPasswordError("Incorrect password. Please try again.");
+                    }
+                }
+            }
+
+            Label {
+                text: "Owner Password not necessary field to read document but needed to copy and print."
+                font.bold: true
+                font.pixelSize: 11
+                wrapMode: Text.WordWrap
+                Layout.maximumWidth: 320
+            }
+
+            Label {
+                text: "Owner Password:"
+            }
+
+            TextField {
+                id: ownerPasswordTextField
+                Layout.fillWidth: true
+                echoMode: TextInput.Password
+                placeholderText: "Enter Owner Password"
+                onAccepted: {
+                    if (documentManager.unlockPendingDocument(userPasswordTextField.text, ownerPasswordTextField.text)) {
+                        passwordDialog.close();
+                    } else {
+                        passwordDialog.showPasswordError("Incorrect password. Please try again.");
                     }
                 }
             }
@@ -263,6 +309,7 @@ ApplicationWindow {
             Button {
                 text: "Cancel"
                 onClicked: {
+                    passwordErrorTimer.stop();
                     documentManager.cancelPendingDocument();
                     passwordDialog.close();
                 }
@@ -271,10 +318,10 @@ ApplicationWindow {
             Button {
                 text: "OK"
                 onClicked: {
-                    if (documentManager.unlockPendingDocument(passwordTextField.text)) {
+                    if (documentManager.unlockPendingDocument(userPasswordTextField.text, ownerPasswordTextField.text)) {
                         passwordDialog.close();
                     } else {
-                        passwordDialog.errorMessage = "Incorrect password. Please try again.";
+                        passwordDialog.showPasswordError("Incorrect password. Please try again.");
                     }
                 }
             }

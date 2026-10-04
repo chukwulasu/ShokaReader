@@ -22,7 +22,7 @@ public:
     ~DocumentManager() override = default;
     Q_INVOKABLE void openDocument(const QUrl& filePath);
     Q_INVOKABLE void releaseDocument();
-    Q_INVOKABLE bool unlockPendingDocument(const QString& password);
+    Q_INVOKABLE bool unlockPendingDocument(const QString& userPassword, const QString& ownerPassword = QString());
     Q_INVOKABLE void cancelPendingDocument();
     DocumentBase* getActiveDocument() const;
     DocumentType getFileType(const QUrl& qmlFilePath) const;

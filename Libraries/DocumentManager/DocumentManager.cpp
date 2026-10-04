@@ -58,28 +58,14 @@ void DocumentManager::openDocument(const QUrl& filePath) {
     }
 }
 
-bool PdfDocument::unlock(const QString& password) {
-    if (m_pdfDocument == nullptr || m_pdfDocument->isLocked() == false) {
+bool DocumentManager::unlockPendingDocument(const QString& userPassword, const QString& ownerPassword) {
+    if (m_pendingDocument == nullptr) {
         return false;
     }
 
-    QByteArray passBytes = password.toUtf8();
-
-    // Attempt to unlock with the provided password
-    m_pdfDocument->unlock(passBytes, passBytes);
-
-    if (m_pdfDocument->isLocked() == true) {
-        m_pdfDocument->unlock(QByteArray(), passBytes);
-    }
-
-    if (m_pdfDocument->isLocked() == true) {
-        m_pdfDocument->unlock(passBytes, QByteArray());
-    }
-
-    // isLocked is used to verify document unlocked because unlock method has weird behaviour
-    if (m_pdfDocument->isLocked() == false) {
-        m_totalPageNumber = m_pdfDocument->numPages();
-        m_tableOfContents.clear();
+    if (m_pendingDocument->unlock(userPassword, ownerPassword) == true) {
+        m_activeDocument = std::move(m_pendingDocument);
+        emit activeDocumentChanged();
         return true;
     }
 

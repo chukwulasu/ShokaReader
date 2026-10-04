@@ -31,35 +31,49 @@ DocumentState PdfDocument::getDocumentMetaData(const QUrl& filePath) {
 
     m_totalPageNumber = m_pdfDocument->numPages();
     m_tableOfContents.clear();
+    updatePermissions();
     return DocumentState::LoadSuccessful;
 }
 
-bool PdfDocument::unlock(const QString& password) {
+bool PdfDocument::unlock(const QString& userPassword, const QString& ownerPassword) {
     if (m_pdfDocument == nullptr || m_pdfDocument->isLocked() == false) {
         return false;
     }
 
-    QByteArray passBytes = password.toUtf8();
+    QByteArray userBytes = userPassword.toUtf8();
+    QByteArray ownerBytes = ownerPassword.toUtf8();
 
-    // Attempt to unlock with the provided password
-   bool var =  m_pdfDocument->unlock(passBytes, passBytes);
-
-    if (m_pdfDocument->isLocked() == true) {
-        var = m_pdfDocument->unlock(QByteArray(), passBytes);
-    }
-
-    if (m_pdfDocument->isLocked() == true) {
-        var = m_pdfDocument->unlock(passBytes, QByteArray());
+    if (ownerBytes.isEmpty() == false && userBytes.isEmpty() == false) {
+        m_pdfDocument->unlock(ownerBytes, userBytes);
     }
 
     // using isLocked because unlock isn't returning the right true or false value
+    if (m_pdfDocument->isLocked() == true && userBytes.isEmpty() == false) {
+        m_pdfDocument->unlock(QByteArray(), userBytes);
+    }
+
+    if (m_pdfDocument->isLocked() == true && ownerBytes.isEmpty() == false) {
+        m_pdfDocument->unlock(ownerBytes, QByteArray());
+    }
+
+    if (m_pdfDocument->isLocked() == true) {
+        m_pdfDocument->unlock(userBytes, userBytes);
+    }
+
     if (m_pdfDocument->isLocked() == false) {
         m_totalPageNumber = m_pdfDocument->numPages();
         m_tableOfContents.clear();
+        updatePermissions();
         return true;
     }
 
     return false;
+}
+
+void PdfDocument::updatePermissions() {
+    if (m_pdfDocument != nullptr && m_pdfDocument->isLocked() == false) {
+        m_canCopy = m_pdfDocument->okToCopy();
+    }
 }
 
 QImage PdfDocument::getPageImageData(int pageIndex) {

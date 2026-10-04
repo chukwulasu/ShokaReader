@@ -7,9 +7,14 @@ DocumentBase::DocumentBase(QObject* parent)
 
 DocumentBase::~DocumentBase() = default;
 
-bool DocumentBase::unlock(const QString &password) {
-    Q_UNUSED(password);
+bool DocumentBase::unlock(const QString &userPassword, const QString &ownerPassword) {
+    Q_UNUSED(userPassword);
+    Q_UNUSED(ownerPassword);
     return false;
+}
+
+bool DocumentBase::canCopy() const {
+    return m_canCopy;
 }
 
 const QVector<TocItem>& DocumentBase::getTableOfContents(){
