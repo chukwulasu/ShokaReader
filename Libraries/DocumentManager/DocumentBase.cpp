@@ -17,6 +17,21 @@ bool DocumentBase::canCopy() const {
     return m_canCopy;
 }
 
+QList<QRectF> DocumentBase::searchPage(int pageIndex, const QString &text, bool matchCase, bool wholeWord) {
+    Q_UNUSED(pageIndex);
+    Q_UNUSED(text);
+    Q_UNUSED(matchCase);
+    Q_UNUSED(wholeWord);
+    return {};
+}
+
+QList<SearchResultItem> DocumentBase::searchDocument(const QString &text, bool matchCase, bool wholeWord) {
+    Q_UNUSED(text);
+    Q_UNUSED(matchCase);
+    Q_UNUSED(wholeWord);
+    return {};
+}
+
 const QVector<TocItem>& DocumentBase::getTableOfContents(){
     return m_tableOfContents;
 }

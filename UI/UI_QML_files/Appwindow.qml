@@ -79,8 +79,19 @@ ApplicationWindow {
                     id:searchButton
                     source: "../../assets/images/SearchIcon.png"
                     toolTipText: "Search Document(Ctrl + F)"
-                    visible: stackView.currentItem.objectName === "readerScreen"
-                             || stackView.currentItem.objectName === "activelyReading"
+                    shortcut: "Ctrl+F"
+                    visible: stackView.currentItem !== null && (stackView.currentItem.objectName === "readerScreen"
+                             || stackView.currentItem.objectName === "activelyReading")
+                    onClicked: {
+                        if (stackView.currentItem !== null) {
+                            if (stackView.currentItem.objectName === "readerScreen") {
+                                if (stackView.currentItem.isTableOfContentsVisible) {
+                                    stackView.currentItem.isTableOfContentsVisible = false;
+                                }
+                                stackView.currentItem.isSearchSidebarVisible = !stackView.currentItem.isSearchSidebarVisible;
+                            }
+                        }
+                    }
                 }
 
                 //ReaderScreen specific buttons
@@ -99,8 +110,12 @@ ApplicationWindow {
                         source: "../../assets/images/Table_of_contents.png"
                         toolTipText: "Table of Contents"
                         onClicked: {
-                            if (stackView.currentItem !== null && stackView.currentItem.objectName === "readerScreen")
-                                stackView.currentItem.isTableOfContentsVisible = !stackView.currentItem.isTableOfContentsVisible
+                            if (stackView.currentItem !== null && stackView.currentItem.objectName === "readerScreen") {
+                                if (stackView.currentItem.isSearchSidebarVisible) {
+                                    stackView.currentItem.isSearchSidebarVisible = false;
+                                }
+                                stackView.currentItem.isTableOfContentsVisible = !stackView.currentItem.isTableOfContentsVisible;
+                            }
                         }
                     }
 
@@ -233,17 +248,17 @@ ApplicationWindow {
             passwordErrorTimer.restart();
         }
 
-        Timer {
-            id: passwordErrorTimer
-            interval: 1500
-            repeat: false
-            onTriggered: {
-                passwordDialog.errorMessage = "";
-            }
-        }
-
         contentItem: ColumnLayout {
             spacing: 12
+
+            Timer {
+                id: passwordErrorTimer
+                interval: 3000
+                repeat: false
+                onTriggered: {
+                    passwordDialog.errorMessage = "";
+                }
+            }
 
             Label {
                 text: "\"" + passwordDialog.targetFileName + "\" is password protected."

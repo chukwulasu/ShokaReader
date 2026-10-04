@@ -26,6 +26,16 @@ public:
     */
     Q_INVOKABLE QSizeF getPageSizePoints(int pageIndex) override;
 
+    /*
+    Searches a specific page for text using Poppler's search routine.
+    */
+    Q_INVOKABLE QList<QRectF> searchPage(int pageIndex, const QString &text, bool matchCase = false, bool wholeWord = false) override;
+
+    /*
+    Searches the entire document and returns snippets with page numbers.
+    */
+    Q_INVOKABLE QList<SearchResultItem> searchDocument(const QString &text, bool matchCase = false, bool wholeWord = false) override;
+
 private:
     // Recursive helper functions to parse Poppler's TOC tree
     void parsePopplerToc(const QVector<Poppler::OutlineItem>& items, QVector<TocItem>& tocVector, int currentDepth = 0);

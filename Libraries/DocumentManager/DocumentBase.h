@@ -5,6 +5,7 @@
 #include <QString>
 #include <QImage>
 #include <QSizeF>
+#include <QRectF>
 #include <QAbstractListModel>
 #include <QVector>
 #include <QList>
@@ -66,6 +67,30 @@ public:
 
 Q_DECLARE_METATYPE(TextRectItem)
 
+struct SearchResultItem {
+    Q_GADGET
+
+    Q_PROPERTY(int pageNum MEMBER pageNum CONSTANT)
+    Q_PROPERTY(QString textBefore MEMBER textBefore CONSTANT)
+    Q_PROPERTY(QString matchText MEMBER matchText CONSTANT)
+    Q_PROPERTY(QString textAfter MEMBER textAfter CONSTANT)
+
+public:
+    int pageNum = 1;
+    QString textBefore;
+    QString matchText;
+    QString textAfter;
+
+    bool operator==(const SearchResultItem& other) const {
+        return pageNum == other.pageNum &&
+               textBefore == other.textBefore &&
+               matchText == other.matchText &&
+               textAfter == other.textAfter;
+    }
+};
+
+Q_DECLARE_METATYPE(SearchResultItem)
+
 class DocumentBase : public QAbstractListModel{
     Q_OBJECT
     Q_PROPERTY(QUrl fileUrl READ getFileUrl CONSTANT)
@@ -83,6 +108,9 @@ public:
     virtual const QVector<TocItem>& getTableOfContents();
     Q_INVOKABLE virtual QList<TextRectItem> getPageTextRects(int pageIndex) = 0;
     Q_INVOKABLE virtual QSizeF getPageSizePoints(int pageIndex) = 0;
+    Q_INVOKABLE virtual QList<QRectF> searchPage(int pageIndex, const QString &text, bool matchCase = false, bool wholeWord = false);
+    Q_INVOKABLE virtual QList<SearchResultItem> searchDocument(const QString &text, bool matchCase = false, bool wholeWord = false);
+
     QUrl getFileUrl() const;
     int getTotalPageNumber() const;
     QString getTitle() const;

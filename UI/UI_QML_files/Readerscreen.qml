@@ -13,6 +13,10 @@ Rectangle {
     property real currentZoom: 1
     property real pageRotation: 0
     property bool isTableOfContentsVisible: false
+    property bool isSearchSidebarVisible: false
+    property string searchPhrase: ""
+    property bool searchMatchCase: false
+    property bool searchMatchWholeWord: false
 
     // Multi-page document selection tracking
     property int selStartPage: -1
@@ -27,7 +31,7 @@ Rectangle {
 
     Timer {
         id: autoScrollTimer
-        interval: 16 // ~60 FPS smooth scrolling
+        interval: 16
         running: autoScrollSpeed !== 0
         repeat: true
         onTriggered: {
@@ -38,7 +42,6 @@ Rectangle {
         }
     }
 
-    // Global hit-test helper to find which page and which word is under the pointer
     function hitTestGlobal(scenePt) {
         let contentPt = listView.contentItem.mapFromItem(null, scenePt.x, scenePt.y);
         let targetIndex = listView.indexAt(contentPt.x, contentPt.y);
@@ -67,7 +70,6 @@ Rectangle {
                   .replace(/'/g, "&#039;");
     }
 
-    // Collects text preserving line wraps, paragraph structure, alignment, and proportional font size
     function collectGlobalText() {
         if (selStartPage === -1 || selEndPage === -1 || !documentManager.activeDocument) {
             return "";
@@ -95,7 +97,6 @@ Rectangle {
 
             if (firstW > lastW) continue;
 
-            // 1. Group selected boxes on this page into visual lines
             let lines = [];
             let currentLine = [];
 
@@ -127,7 +128,6 @@ Rectangle {
 
             if (lines.length === 0) continue;
 
-            // 2. Identify the standard body text left margin for this page
             let bodyLeftMargin = 999999;
             for (let ln of lines) {
                 let minX = ln[0].x;
@@ -142,7 +142,6 @@ Rectangle {
                 bodyLeftMargin = 72;
             }
 
-            // 3. Process each line, capturing text alignment and font size in points
             let prevLineInfo = null;
             let currentParagraphLines = [];
             let currentParagraphIsCentered = false;
@@ -187,10 +186,7 @@ Rectangle {
                 let marginDiff = Math.abs(leftMargin - rightMargin);
                 let lineWidth = lineMaxX - lineMinX;
 
-                // Center alignment check
                 let isCentered = (marginDiff < 32) && (leftMargin > bodyLeftMargin + 18 || lineWidth < pageWidth * 0.65);
-
-                // Line font size in points directly from word bounding heights
                 let lineFontSize = Math.max(6, Math.round(maxWordHeight));
 
                 let isNewBlock = false;
@@ -201,7 +197,6 @@ Rectangle {
                     let prevH = prevLineInfo.maxY - prevLineInfo.minY;
                     let fontDiff = Math.abs(lineFontSize - prevLineInfo.fontSize);
 
-                    // Break paragraph if alignment switches, vertical gap is large, or font size shifts noticeably (>= 3pt)
                     if (isCentered !== prevLineInfo.isCentered || vGap > prevH * 0.55 || fontDiff >= 3) {
                         isNewBlock = true;
                     }
@@ -229,7 +224,6 @@ Rectangle {
         return htmlOutput;
     }
 
-    // Clipboard helper for QML with RichText support
     TextEdit {
         id: clipboardBridge
         visible: false
@@ -252,15 +246,18 @@ Rectangle {
         forceActiveFocus();
     }
 
-    // When the TOC is closed, return keyboard focus to the reader so the
-    // navigation keys immediately control the document again.
     onIsTableOfContentsVisibleChanged: {
-        if (!isTableOfContentsVisible) {
+        if (!isTableOfContentsVisible && !isSearchSidebarVisible) {
             forceActiveFocus();
         }
     }
 
-    //TODO: remove later after you are done with the product, to be used to test lifecycle of stackview items
+    onIsSearchSidebarVisibleChanged: {
+        if (!isSearchSidebarVisible && !isTableOfContentsVisible) {
+            forceActiveFocus();
+        }
+    }
+
     Component.onDestruction: {
         console.log("[Lifecycle] Readerscreen has been destroyed and freed from memory.");
     }
@@ -329,7 +326,6 @@ Rectangle {
         listView.positionViewAtEnd();
     }
 
-    // Global Ctrl+C Shortcut
     Shortcut {
         sequence: [StandardKey.Copy]
         enabled: readerScreen.activeSelectedText.length > 0
@@ -374,47 +370,59 @@ Rectangle {
         }
     }
 
-    Item{ /*RowLayout not used because the rectangle on the scroll bar was out
-            of place and ran into other issues trying to work around using the
-            RowLayout */
-            anchors.fill: parent
-            C_TableOfContentsSidebar{
-                id:tableOfContents
-                visible: isTableOfContentsVisible
-                reader: readerScreen
-                anchors{
-                    left: parent.left
-                    top: parent.top
-                    bottom: parent.bottom
-                }
-            }
+    Item {
+        anchors.fill: parent
 
-            ListView {
-                id: listView
-                anchors {
-                    left: isTableOfContentsVisible ? tableOfContents.right : parent.left
-                    right: parent.right
-                    top: parent.top
-                    bottom: parent.bottom
-                }
-                clip: true
-                spacing: 0
-                cacheBuffer: 1000 // Keeps delegates instantiated outside the visible area for smoother scrolling
-                model: documentManager.activeDocument ? documentManager.activeDocument : null
+        // Table Of Contents Sidebar
+        C_TableOfContentsSidebar {
+            id: tableOfContents
+            visible: isTableOfContentsVisible
+            reader: readerScreen
+            anchors {
+                left: parent.left
+                top: parent.top
+                bottom: parent.bottom
+            }
+        }
+
+        // Search Sidebar (replaces TOC position when visible)
+        C_SearchSidebar {
+            id: searchSidebar
+            visible: isSearchSidebarVisible
+            reader: readerScreen
+            anchors {
+                left: parent.left
+                top: parent.top
+                bottom: parent.bottom
+            }
+        }
+
+        ListView {
+            id: listView
+            anchors {
+                left: isTableOfContentsVisible
+                      ? tableOfContents.right
+                      : (isSearchSidebarVisible ? searchSidebar.right : parent.left)
+                right: parent.right
+                top: parent.top
+                bottom: parent.bottom
+            }
+            clip: true
+            spacing: 0
+            cacheBuffer: 1000
+            model: documentManager.activeDocument ? documentManager.activeDocument : null
 
             WheelHandler {
                 id: zoomWheelHandler
-                // Trackpads send pinch-to-zoom as wheel events with the Ctrl modifier
                 acceptedModifiers: Qt.ControlModifier
 
                 onWheel: (event) => {
-                    // event.angleDelta.y indicates zoom direction on trackpad pinch
                     if (event.angleDelta.y > 0) {
                         zoomIn();
                     } else if (event.angleDelta.y < 0) {
                         zoomOut();
                     }
-                    event.accepted = true; // Stop it from scrolling the page when zooming
+                    event.accepted = true;
                 }
             }
 
@@ -427,7 +435,6 @@ Rectangle {
 
             flickableDirection: Flickable.HorizontalAndVerticalFlick
 
-            // This forces the horizontal scrollbar handle to shrink and stops it from snapping back.
             contentWidth: {
                 let maxW = listView.width;
                 for (let i = 0; i < contentItem.children.length; ++i) {
@@ -462,7 +469,6 @@ Rectangle {
                 z: 100
             }
 
-            // Global TapHandler to dismiss selection on a plain left-click
             TapHandler {
                 acceptedButtons: Qt.LeftButton
                 gesturePolicy: TapHandler.DragThreshold
@@ -477,7 +483,6 @@ Rectangle {
                 }
             }
 
-            // Global Right-Click Handler for Floating Copy Menu
             TapHandler {
                 acceptedButtons: Qt.RightButton
                 onTapped: {
@@ -489,7 +494,6 @@ Rectangle {
                         return;
                     }
 
-                    // Position the menu relative to the ListView viewport
                     let localPos = listView.mapFromItem(null, point.scenePosition.x, point.scenePosition.y);
                     globalFloatingCopyMenu.x = Math.max(8, Math.min(localPos.x, listView.width - globalFloatingCopyMenu.width - 8));
                     globalFloatingCopyMenu.y = (localPos.y - globalFloatingCopyMenu.height - 4 < 0)
@@ -499,7 +503,6 @@ Rectangle {
                 }
             }
 
-            // GLOBAL DRAG HANDLER: Spans across page delegates and boundaries
             DragHandler {
                 id: globalDragSelection
                 target: null
@@ -555,7 +558,6 @@ Rectangle {
                         return;
                     }
 
-                    // 1. Edge Proximity Auto-Scroll Detection
                     let viewPos = listView.mapFromItem(null, centroid.scenePosition.x, centroid.scenePosition.y);
                     let margin = 50;
 
@@ -569,7 +571,6 @@ Rectangle {
                         readerScreen.autoScrollSpeed = 0;
                     }
 
-                    // 2. Global page & word coordinate tracking across boundaries
                     let hit = readerScreen.hitTestGlobal(centroid.scenePosition);
                     if (hit && hit.page >= 0) {
                         readerScreen.selEndPage = hit.page;
@@ -581,7 +582,6 @@ Rectangle {
                 }
             }
 
-            // Global floating copy menu inside the ListView viewport
             C_FloatingCopyMenu {
                 id: globalFloatingCopyMenu
                 visible: false
@@ -598,6 +598,11 @@ Rectangle {
                 property var textRects: []
                 property var pageSizePoints: Qt.size(0, 0)
                 property alias pageContainerRef: pageContainer
+
+                // Search highlights on this page
+                property var searchHighlights: (readerScreen.searchPhrase.length > 0 && documentManager.activeDocument)
+                                               ? documentManager.activeDocument.searchPage(index, readerScreen.searchPhrase, readerScreen.searchMatchCase, readerScreen.searchMatchWholeWord)
+                                               : []
 
                 property real uniformWidth: listView.width * 0.65
                 property real pageAspectRatio:
@@ -632,9 +637,6 @@ Rectangle {
                     border.width: 1
 
                     function mapMouseToPdf(scenePoint) {
-                        // Convert the pointer from scene coordinates into the
-                        // pageContainer's local coordinates. Qt performs the
-                        // rotation/position/transform conversion for us.
                         let localPoint = pageContainer.mapFromItem(
                             null,
                             scenePoint.x,
@@ -650,11 +652,9 @@ Rectangle {
                         );
                     }
 
-                    // Geometry-aware hit testing to prevent premature selection jumping
                     function findNearestWordIndex(pt) {
                         if (textRects.length === 0) return -1;
 
-                        // 1. Exact hit test inside box bounds
                         for (let i = 0; i < textRects.length; ++i) {
                             let box = textRects[i];
                             if (pt.x >= box.x && pt.x <= box.x + box.width &&
@@ -663,18 +663,15 @@ Rectangle {
                             }
                         }
 
-                        // 2. Pointer is strictly above the first text line on this page
                         if (pt.y < textRects[0].y) {
                             return 0;
                         }
 
-                        // 3. Pointer is strictly below the last text line on this page
                         let lastBox = textRects[textRects.length - 1];
                         if (pt.y > lastBox.y + lastBox.height) {
                             return textRects.length - 1;
                         }
 
-                        // 4. Pointer is on a line but within horizontal whitespace
                         let closestIdx = -1;
                         let minDistance = 999999;
 
@@ -702,7 +699,6 @@ Rectangle {
                         return smallerHeight > 0 && overlap >= smallerHeight * 0.5;
                     }
 
-                    // Computes line spans for this specific page based on the global selection range
                     function getSelectedLineSpans() {
                         let sPage = readerScreen.selStartPage;
                         let ePage = readerScreen.selEndPage;
@@ -777,14 +773,35 @@ Rectangle {
                     Image {
                         id: pageImage
                         anchors.fill: parent
-                        cache: false // Keeping image cache disabled per user setup
-                        retainWhileLoading: true // Keeps previous image visible during asynchronous source changes to reduce flashing
+                        cache: false
+                        retainWhileLoading: true
                         source: "image://documentProvider/page_" + index
                         fillMode: Image.PreserveAspectFit
                         asynchronous: true
                     }
 
-                    // Highlights react to global selection page & word updates
+                    // Search Highlight Ribbon (Yellow)
+                    Repeater {
+                        model: pageDelegate.searchHighlights
+                        delegate: Rectangle {
+                            required property var modelData
+
+                            property real invScaleX: pageContainer.width / pageSizePoints.width
+                            property real invScaleY: pageContainer.height / pageSizePoints.height
+
+                            x: modelData.x * invScaleX
+                            y: modelData.y * invScaleY
+                            width: modelData.width * invScaleX
+                            height: modelData.height * invScaleY
+
+                            color: "#70FFEB3B"
+                            border.color: "#FBC02D"
+                            border.width: 1
+                            radius: 2
+                        }
+                    }
+
+                    // Selection Highlight Ribbon (Blue)
                     Repeater {
                         model: {
                             let _trigger1 = readerScreen.selStartPage;
@@ -801,7 +818,7 @@ Rectangle {
                             width: modelData.width
                             height: modelData.height
 
-                            color: "#400000FF" // Smooth semi-transparent blue highlight ribbon
+                            color: "#400000FF"
                             border.color: "transparent"
                         }
                     }

@@ -1,5 +1,6 @@
 #include <QFileInfo>
 #include <QDebug>
+#include <QLineF>
 #include <algorithm>
 #include "Libraries/DocumentManager/PdfDocument.h"
 
@@ -13,7 +14,6 @@ DocumentState PdfDocument::getDocumentMetaData(const QUrl& filePath) {
     QString localPath = filePath.toLocalFile();
 
     m_pdfDocument = Poppler::Document::load(localPath);
-    // TODO: write code to provide dialog to unlokck locked pdf files
     if (m_pdfDocument == nullptr) {
         m_totalPageNumber = 0;
         m_title.clear();
@@ -47,7 +47,6 @@ bool PdfDocument::unlock(const QString& userPassword, const QString& ownerPasswo
         m_pdfDocument->unlock(ownerBytes, userBytes);
     }
 
-    // using isLocked because unlock isn't returning the right true or false value
     if (m_pdfDocument->isLocked() == true && userBytes.isEmpty() == false) {
         m_pdfDocument->unlock(QByteArray(), userBytes);
     }
@@ -76,6 +75,121 @@ void PdfDocument::updatePermissions() {
     }
 }
 
+QList<QRectF> PdfDocument::searchPage(int pageIndex, const QString &text, bool matchCase, bool wholeWord) {
+    if (m_pdfDocument == nullptr || m_pdfDocument->isLocked() || text.trimmed().isEmpty() || pageIndex < 0 || pageIndex >= m_totalPageNumber) {
+        return {};
+    }
+
+    std::unique_ptr<Poppler::Page> pdfPage(m_pdfDocument->page(pageIndex));
+    if (pdfPage == nullptr) {
+        return {};
+    }
+
+    Poppler::Page::SearchFlags flags;
+    if (!matchCase) {
+        flags |= Poppler::Page::IgnoreCase;
+    }
+    if (wholeWord) {
+        flags |= Poppler::Page::WholeWords;
+    }
+
+    return pdfPage->search(text, flags);
+}
+
+QList<SearchResultItem> PdfDocument::searchDocument(const QString &text, bool matchCase, bool wholeWord) {
+    QList<SearchResultItem> allResults;
+    if (m_pdfDocument == nullptr || m_pdfDocument->isLocked() || text.trimmed().isEmpty() || m_totalPageNumber <= 0) {
+        return allResults;
+    }
+
+    Poppler::Page::SearchFlags flags;
+    if (!matchCase) {
+        flags |= Poppler::Page::IgnoreCase;
+    }
+    if (wholeWord) {
+        flags |= Poppler::Page::WholeWords;
+    }
+
+    for (int p = 0; p < m_totalPageNumber; ++p) {
+        std::unique_ptr<Poppler::Page> pdfPage(m_pdfDocument->page(p));
+        if (!pdfPage) continue;
+
+        const QList<QRectF> matches = pdfPage->search(text, flags);
+        if (matches.isEmpty()) continue;
+
+        // Extract words on this matched page to construct contextual snippets
+        std::vector<std::unique_ptr<Poppler::TextBox>> textBoxList = pdfPage->textList();
+        textBoxList.erase(
+            std::remove_if(textBoxList.begin(), textBoxList.end(),
+                           [](const std::unique_ptr<Poppler::TextBox>& ptr) { return ptr == nullptr; }),
+            textBoxList.end()
+            );
+
+        std::stable_sort(textBoxList.begin(), textBoxList.end(),
+                         [](const std::unique_ptr<Poppler::TextBox>& a, const std::unique_ptr<Poppler::TextBox>& b) {
+                             QRectF rectA = a->boundingBox();
+                             QRectF rectB = b->boundingBox();
+                             qreal overlapTop = std::max(rectA.top(), rectB.top());
+                             qreal overlapBottom = std::min(rectA.bottom(), rectB.bottom());
+                             qreal overlap = std::max<qreal>(0.0, overlapBottom - overlapTop);
+                             qreal minHeight = std::min(rectA.height(), rectB.height());
+                             if (minHeight > 0.0 && overlap >= minHeight * 0.5) {
+                                 return rectA.left() < rectB.left();
+                             }
+                             return rectA.top() < rectB.top();
+                         });
+
+        for (const QRectF &matchRect : std::as_const(matches)) {
+            SearchResultItem item;
+            item.pageNum = p + 1; // 1-indexed for display
+
+            QPointF matchCenter = matchRect.center();
+            int matchIdx = -1;
+            qreal minDistance = 999999.0;
+
+            for (size_t i = 0; i < textBoxList.size(); ++i) {
+                if (matchRect.contains(textBoxList[i]->boundingBox().center()) ||
+                    textBoxList[i]->boundingBox().intersects(matchRect)) {
+                    matchIdx = static_cast<int>(i);
+                    break;
+                }
+                qreal d = QLineF(matchCenter, textBoxList[i]->boundingBox().center()).length();
+                if (d < minDistance) {
+                    minDistance = d;
+                    matchIdx = static_cast<int>(i);
+                }
+            }
+
+            if (matchIdx >= 0 && matchIdx < static_cast<int>(textBoxList.size())) {
+                int startBefore = std::max(0, matchIdx - 4);
+                QStringList beforeList;
+                for (int b = startBefore; b < matchIdx; ++b) {
+                    beforeList.append(textBoxList[b]->text());
+                }
+                item.textBefore = beforeList.join(" ");
+
+                item.matchText = textBoxList[matchIdx]->text();
+                if (item.matchText.isEmpty()) {
+                    item.matchText = text;
+                }
+
+                int endAfter = std::min(static_cast<int>(textBoxList.size()), matchIdx + 6);
+                QStringList afterList;
+                for (int a = matchIdx + 1; a < endAfter; ++a) {
+                    afterList.append(textBoxList[a]->text());
+                }
+                item.textAfter = afterList.join(" ");
+            } else {
+                item.matchText = text;
+            }
+
+            allResults.append(item);
+        }
+    }
+
+    return allResults;
+}
+
 QImage PdfDocument::getPageImageData(int pageIndex) {
     if (m_pdfDocument == nullptr || m_pdfDocument->isLocked() == true || pageIndex < 0 || pageIndex >= m_totalPageNumber) {
         return QImage();
@@ -86,7 +200,7 @@ QImage PdfDocument::getPageImageData(int pageIndex) {
         return QImage();
     }
 
-    constexpr double renderDpi = 180.0; // 180 DPI gave the best result for performacne and resolution so don't change it
+    constexpr double renderDpi = 180.0;
 
     return pdfPage->renderToImage(renderDpi, renderDpi);
 }
@@ -107,14 +221,12 @@ QList<TextRectItem> PdfDocument::getPageTextRects(int pageIndex) {
         return rectsList;
     }
 
-    // Filter out null elements before sorting
     textBoxList.erase(
         std::remove_if(textBoxList.begin(), textBoxList.end(),
                        [](const std::unique_ptr<Poppler::TextBox>& ptr) { return ptr == nullptr; }),
         textBoxList.end()
         );
 
-    // Sort words into reading layout order (top-to-bottom, left-to-right)
     std::stable_sort(textBoxList.begin(), textBoxList.end(),
                      [](const std::unique_ptr<Poppler::TextBox>& a, const std::unique_ptr<Poppler::TextBox>& b) {
                          QRectF rectA = a->boundingBox();
@@ -125,12 +237,10 @@ QList<TextRectItem> PdfDocument::getPageTextRects(int pageIndex) {
                          qreal overlap = std::max<qreal>(0.0, overlapBottom - overlapTop);
                          qreal minHeight = std::min(rectA.height(), rectB.height());
 
-                         // If vertical overlap is >= 50% of the smaller box's height, consider them on the same line
                          if (minHeight > 0.0 && overlap >= minHeight * 0.5) {
                              return rectA.left() < rectB.left();
                          }
 
-                         // Otherwise, sort vertically top-to-bottom
                          return rectA.top() < rectB.top();
                      }
                      );
