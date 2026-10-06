@@ -28,7 +28,7 @@ Rectangle {
     }
 
     function getFlattenedToc(items, query, parentPath) {
-        if (items === null){
+        if (items === null) {
             return [];
         }
 
@@ -62,6 +62,7 @@ Rectangle {
             result.push({
                 title: item.title,
                 pageNum: item.pageNum,
+                targetLocation: item.targetLocation || "",
                 hasChildren: hasKids,
                 level: parentPath ? parentPath.split('.').length : 0,
                 path: currentPath,
@@ -119,36 +120,32 @@ Rectangle {
             anchors.left: parent.left
             anchors.right: parent.right
             height: 36
-            placeholderText: "Search bookmarks"
+            placeholderText: "Search contents"
             leftPadding: 32
             rightPadding: 30
             verticalAlignment: TextInput.AlignVCenter
 
-            // Cursor only renders when the field has active keyboard focus
             cursorVisible: activeFocus
 
             Keys.priority: Keys.BeforeItem
             Keys.onPressed: (event) => {
-                if(tocSidebar.reader !== null){
-                    if(event.key === Qt.Key_Home){
+                if (tocSidebar.reader !== null) {
+                    if (event.key === Qt.Key_Home) {
                         tocSidebar.reader.goToFirstPage();
                         event.accepted = true;
                     }
-
-                    else if(event.key === Qt.Key_End){
+                    else if (event.key === Qt.Key_End) {
                         tocSidebar.reader.goToLastPage();
                         event.accepted = true;
                     }
-
-                    else if(event.key === Qt.Key_Left){
-                        if(searchField.cursorPosition > 0){
+                    else if (event.key === Qt.Key_Left) {
+                        if (searchField.cursorPosition > 0) {
                             searchField.cursorPosition -= 1;
                         }
                         event.accepted = true;
                     }
-
-                    else if(event.key === Qt.Key_Right){
-                        if(searchField.cursorPosition < searchField.text.length){
+                    else if (event.key === Qt.Key_Right) {
+                        if (searchField.cursorPosition < searchField.text.length) {
                             searchField.cursorPosition += 1;
                         }
                         event.accepted = true;
@@ -227,17 +224,6 @@ Rectangle {
                 width: 6
                 z: 1000
 
-                padding: 0
-                topPadding: 0
-                bottomPadding: 0
-                leftPadding: 0
-                rightPadding: 0
-
-                topInset: 0
-                bottomInset: 0
-                leftInset: 0
-                rightInset: 0
-
                 background: Rectangle {
                     radius: 3
                     color: "#e1e4e8"
@@ -276,15 +262,18 @@ Rectangle {
                             anchors.fill: parent
                             hoverEnabled: true
                             onClicked: {
-                                // Steal focus from the search field so the cursor disappears
-                                if (searchField.activeFocus) {
-                                    if (tocSidebar.reader) {
-                                        tocSidebar.reader.forceActiveFocus();
-                                    }
+                                if (searchField.activeFocus && tocSidebar.reader) {
+                                    tocSidebar.reader.forceActiveFocus();
                                 }
 
-                                if (modelData.pageNum !== undefined && modelData.pageNum > 0 && tocSidebar.reader) {
-                                    tocSidebar.reader.jumpToPage(modelData.pageNum);
+                                if (tocSidebar.reader) {
+                                    let targetPage = (modelData.pageNum !== undefined && modelData.pageNum > 0)
+                                                     ? modelData.pageNum
+                                                     : (documentManager.activeDocument ? documentManager.activeDocument.resolvePage(modelData) : 1);
+
+                                    if (targetPage > 0) {
+                                        tocSidebar.reader.jumpToPage(targetPage);
+                                    }
                                 }
                             }
                         }

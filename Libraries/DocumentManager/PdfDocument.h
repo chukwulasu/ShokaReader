@@ -32,14 +32,16 @@ private:
     void parsePopplerToc(const QVector<Poppler::OutlineItem>& items, QVector<TocItem>& tocVector, int currentDepth = 0);
     void updatePermissions();
 
+    void startBackgroundTextIndexing();
+    void cancelBackgroundIndexing();
+
 private:
     std::unique_ptr<Poppler::Document> m_pdfDocument = nullptr;
 
-    // Concurrency and cache protection
     mutable QMutex m_docMutex;
     mutable QMutex m_cacheMutex;
     std::atomic<uint64_t> m_activeSearchId{0};
+    std::atomic<uint64_t> m_indexingSessionId{0};
 
-    // Option 3: Flat Plain-Text Cache per page
     QVector<QString> m_pageTextCache;
 };

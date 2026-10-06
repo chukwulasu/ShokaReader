@@ -7,6 +7,7 @@
 #include <QAbstractTextDocumentLayout>
 #include <QTextBlock>
 #include <QTextLayout>
+#include <QThread>
 #include <QThreadPool>
 #include <QMutexLocker>
 #include <QStringMatcher>
@@ -31,7 +32,6 @@ struct ZipLocalHeader {
 };
 #pragma pack(pop)
 
-// Subclassed QTextDocument for on-demand image loading (prevents upfront image decoding overhead)
 class EpubResourceDocument : public QTextDocument {
 public:
     EpubResourceDocument(const QMap<QString, QByteArray>& zipEntries, const QString& chapterDir, QObject* parent = nullptr)
@@ -46,13 +46,13 @@ protected:
             }
 
             if (m_zipEntries.contains(urlStr)) {
-                return QImage::fromData(m_zipEntries[urlStr]);
+                return QImage::fromData(m_zipEntries.value(urlStr));
             }
 
             QString rel = m_chapterDir.isEmpty() ? urlStr : (m_chapterDir + "/" + urlStr);
             rel = QDir::cleanPath(rel);
             if (m_zipEntries.contains(rel)) {
-                return QImage::fromData(m_zipEntries[rel]);
+                return QImage::fromData(m_zipEntries.value(rel));
             }
 
             QString fileName = QFileInfo(urlStr).fileName();
@@ -73,11 +73,11 @@ private:
 EpubDocument::EpubDocument(QObject* parent)
     : DocumentBase(parent) {
     m_canCopy = true;
-    m_chapterLayoutCache.setMaxCost(10);
 }
 
 EpubDocument::~EpubDocument() {
     cancelSearch();
+    cancelBackgroundIndexing();
 }
 
 bool EpubDocument::unlock(const QString& userPassword, const QString& ownerPassword) {
@@ -88,6 +88,8 @@ bool EpubDocument::unlock(const QString& userPassword, const QString& ownerPassw
 
 DocumentState EpubDocument::getDocumentMetaData(const QUrl& filePath) {
     cancelSearch();
+    cancelBackgroundIndexing();
+
     m_fileUrl = filePath;
     QString localPath = filePath.toLocalFile();
 
@@ -96,11 +98,14 @@ DocumentState EpubDocument::getDocumentMetaData(const QUrl& filePath) {
     m_manifest.clear();
     m_spineStartPage.clear();
     m_pageMappings.clear();
-    m_chapterPlainTextCache.clear();
     m_tableOfContents.clear();
 
     {
-        QMutexLocker locker(&m_layoutMutex);
+        QMutexLocker locker(&m_textCacheMutex);
+        m_chapterPlainTextCache.clear();
+    }
+    {
+        QMutexLocker locker(&m_renderMutex);
         m_chapterLayoutCache.clear();
     }
     m_totalPageNumber = 0;
@@ -113,18 +118,111 @@ DocumentState EpubDocument::getDocumentMetaData(const QUrl& filePath) {
         return DocumentState::LoadFailed;
     }
 
-    if (m_spine.isEmpty()) {
+    if (m_spine.isEmpty() || m_totalPageNumber <= 0) {
         return DocumentState::LoadFailed;
     }
 
-    if (m_totalPageNumber <= 0) {
-        return DocumentState::LoadFailed;
-    }
+    // Launch background text indexing
+    startBackgroundTextIndexing();
 
     return DocumentState::LoadSuccessful;
 }
 
+void EpubDocument::cancelBackgroundIndexing() {
+    m_indexingSessionId.fetch_add(1);
+}
+
+// Pure XML string extractor (100% thread-safe, no QTextDocument/QFont engine)
+QString EpubDocument::extractPlainTextFromXml(const QByteArray& xmlData) {
+    QString plainText;
+    plainText.reserve(xmlData.size() / 2);
+
+    QXmlStreamReader xml(xmlData);
+    while (!xml.atEnd()) {
+        xml.readNext();
+        if (xml.isCharacters()) {
+            plainText.append(xml.text());
+        } else if (xml.isStartElement()) {
+            const QStringView name = xml.name();
+            if (name == QLatin1String("p") || name == QLatin1String("div") ||
+                name == QLatin1String("h1") || name == QLatin1String("h2") ||
+                name == QLatin1String("h3") || name == QLatin1String("br")) {
+                plainText.append(QLatin1Char('\n'));
+            }
+        }
+    }
+    return plainText;
+}
+
+void EpubDocument::startBackgroundTextIndexing() {
+    const uint64_t currentSession = ++m_indexingSessionId;
+    if (m_spine.isEmpty()) return;
+
+    QThreadPool::globalInstance()->start([this, currentSession]() {
+        for (int s = 0; s < m_spine.size(); ++s) {
+            if (m_indexingSessionId.load() != currentSession) return;
+
+            {
+                QMutexLocker locker(&m_textCacheMutex);
+                if (s < m_chapterPlainTextCache.size() && !m_chapterPlainTextCache[s].isEmpty()) {
+                    continue;
+                }
+            }
+
+            const QString& chapterPath = m_spine[s].zipPath;
+            if (!m_zipEntries.contains(chapterPath)) continue;
+
+            QString plainText = extractPlainTextFromXml(m_zipEntries.value(chapterPath));
+
+            {
+                QMutexLocker locker(&m_textCacheMutex);
+                if (m_indexingSessionId.load() != currentSession) return;
+                if (s < m_chapterPlainTextCache.size()) {
+                    m_chapterPlainTextCache[s] = std::move(plainText);
+                }
+            }
+
+            QThread::msleep(5); // Cooperative yield
+        }
+    });
+}
+
+void EpubDocument::paginateDocument() {
+    m_pageMappings.clear();
+    m_spineStartPage.clear();
+
+    {
+        QMutexLocker locker(&m_textCacheMutex);
+        m_chapterPlainTextCache.clear();
+        m_chapterPlainTextCache.resize(m_spine.size());
+    }
+
+    int runningGlobalPage = 0;
+
+    for (int s = 0; s < m_spine.size(); ++s) {
+        const QString& path = m_spine[s].zipPath;
+        m_spineStartPage.insert(path, runningGlobalPage);
+
+        qint64 byteSize = m_zipEntries.value(path).size();
+        int chapterPages = std::max<int>(1, static_cast<int>(std::ceil(static_cast<double>(byteSize) / BYTES_PER_SYNTHETIC_PAGE)));
+
+        for (int p = 0; p < chapterPages; ++p) {
+            EpubPageMapping mapping;
+            mapping.spineIndex = s;
+            mapping.pageInChapter = p;
+            mapping.totalPagesInChapter = chapterPages;
+            mapping.globalPageIndex = runningGlobalPage;
+            m_pageMappings.append(mapping);
+            runningGlobalPage++;
+        }
+    }
+
+    m_totalPageNumber = m_pageMappings.size();
+}
+
 QImage EpubDocument::getPageImageData(int pageIndex) {
+    QMutexLocker locker(&m_renderMutex); // Serializes QTextDocument layout across threads
+
     if (pageIndex < 0 || pageIndex >= m_totalPageNumber || pageIndex >= m_pageMappings.size()) {
         return QImage();
     }
@@ -148,15 +246,17 @@ QImage EpubDocument::getPageImageData(int pageIndex) {
     painter.setRenderHint(QPainter::SmoothPixmapTransform, true);
     painter.scale(scale, scale);
 
-    const qreal pageY = mapping.pageInChapter * PAGE_HEIGHT_POINTS;
-    const QRectF pageRect(0.0, pageY, PAGE_WIDTH_POINTS, PAGE_HEIGHT_POINTS);
+    qreal docHeight = std::max(PAGE_HEIGHT_POINTS, doc->size().height());
+    int totalPages = std::max(1, mapping.totalPagesInChapter);
+    qreal sliceHeight = docHeight / totalPages;
+    qreal pageY = mapping.pageInChapter * sliceHeight;
 
     painter.save();
     painter.translate(0.0, -pageY);
-    painter.setClipRect(pageRect);
+    painter.setClipRect(QRectF(0.0, pageY, PAGE_WIDTH_POINTS, sliceHeight));
 
     QAbstractTextDocumentLayout::PaintContext ctx;
-    ctx.clip = pageRect;
+    ctx.clip = QRectF(0.0, pageY, PAGE_WIDTH_POINTS, sliceHeight);
     doc->documentLayout()->draw(&painter, ctx);
 
     painter.restore();
@@ -164,6 +264,8 @@ QImage EpubDocument::getPageImageData(int pageIndex) {
 }
 
 QList<TextRectItem> EpubDocument::getPageTextRects(int pageIndex) {
+    QMutexLocker locker(&m_renderMutex); // Serializes QTextDocument word extraction
+
     if (pageIndex < 0 || pageIndex >= m_totalPageNumber || pageIndex >= m_pageMappings.size()) {
         return {};
     }
@@ -174,7 +276,7 @@ QList<TextRectItem> EpubDocument::getPageTextRects(int pageIndex) {
         return {};
     }
 
-    return extractWordRectsForPage(doc.get(), mapping.pageInChapter);
+    return extractWordRectsForPage(doc.get(), mapping.pageInChapter, mapping.totalPagesInChapter);
 }
 
 QSizeF EpubDocument::getPageSizePoints(int pageIndex) {
@@ -184,6 +286,23 @@ QSizeF EpubDocument::getPageSizePoints(int pageIndex) {
 
 const QVector<TocItem>& EpubDocument::getTableOfContents() {
     return m_tableOfContents;
+}
+
+int EpubDocument::resolvePage(int pageNum, const QString &targetLocation) const {
+    if (pageNum > 0) return pageNum;
+    if (!targetLocation.isEmpty()) {
+        QString pureFile = targetLocation.split('#').first();
+        if (m_spineStartPage.contains(pureFile)) {
+            return m_spineStartPage[pureFile] + 1;
+        }
+    }
+    return 1;
+}
+
+int EpubDocument::resolvePage(const QVariantMap &item) const {
+    int page = item.value("pageNum").toInt();
+    QString target = item.value("targetLocation").toString();
+    return resolvePage(page, target);
 }
 
 QList<QRectF> EpubDocument::searchPage(int pageIndex, const QString &text, bool matchCase, bool wholeWord) {
@@ -196,13 +315,7 @@ QList<QRectF> EpubDocument::searchPage(int pageIndex, const QString &text, bool 
     Qt::CaseSensitivity cs = matchCase ? Qt::CaseSensitive : Qt::CaseInsensitive;
 
     for (const auto& item : rects) {
-        bool isMatch = false;
-        if (wholeWord) {
-            isMatch = (item.text.compare(text, cs) == 0);
-        } else {
-            isMatch = item.text.contains(text, cs);
-        }
-
+        bool isMatch = wholeWord ? (item.text.compare(text, cs) == 0) : item.text.contains(text, cs);
         if (isMatch) {
             matches.append(QRectF(item.x, item.y, item.width, item.height));
         }
@@ -222,7 +335,6 @@ void EpubDocument::cancelSearch() {
     m_activeSearchId.fetch_add(1);
 }
 
-// Background asynchronous search via Boyer-Moore (QStringMatcher)
 void EpubDocument::startSearch(const QString &text, bool matchCase, bool wholeWord) {
     const uint64_t currentId = ++m_activeSearchId;
     const QString query = text.trimmed();
@@ -237,18 +349,32 @@ void EpubDocument::startSearch(const QString &text, bool matchCase, bool wholeWo
         QList<SearchResultItem> results;
 
         for (int s = 0; s < m_spine.size(); ++s) {
-            if (m_activeSearchId.load() != currentId) {
-                return; // Aborted by newer query
+            if (m_activeSearchId.load() != currentId) return;
+
+            QString plainText;
+            {
+                QMutexLocker locker(&m_textCacheMutex);
+                if (s < m_chapterPlainTextCache.size()) {
+                    plainText = m_chapterPlainTextCache[s];
+                }
             }
 
-            if (s >= m_chapterPlainTextCache.size()) continue;
-            const QString& plainText = m_chapterPlainTextCache[s];
+            if (plainText.isEmpty()) {
+                const QString& chapterPath = m_spine[s].zipPath;
+                if (m_zipEntries.contains(chapterPath)) {
+                    plainText = extractPlainTextFromXml(m_zipEntries.value(chapterPath));
+                    QMutexLocker locker(&m_textCacheMutex);
+                    if (s < m_chapterPlainTextCache.size()) {
+                        m_chapterPlainTextCache[s] = plainText;
+                    }
+                }
+            }
+
             if (plainText.isEmpty()) continue;
 
             const QString& chapterPath = m_spine[s].zipPath;
             int startPage = m_spineStartPage.value(chapterPath, 0);
 
-            // Fast Boyer-Moore scan
             qsizetype from = 0;
             while (from < plainText.length()) {
                 if (m_activeSearchId.load() != currentId) return;
@@ -258,29 +384,18 @@ void EpubDocument::startSearch(const QString &text, bool matchCase, bool wholeWo
 
                 bool valid = true;
                 if (wholeWord) {
-                    if (matchIdx > 0 && plainText.at(matchIdx - 1).isLetterOrNumber()) {
-                        valid = false;
-                    }
+                    if (matchIdx > 0 && plainText.at(matchIdx - 1).isLetterOrNumber()) valid = false;
                     qsizetype endIdx = matchIdx + query.length();
-                    if (endIdx < plainText.length() && plainText.at(endIdx).isLetterOrNumber()) {
-                        valid = false;
-                    }
+                    if (endIdx < plainText.length() && plainText.at(endIdx).isLetterOrNumber()) valid = false;
                 }
 
                 if (valid) {
                     SearchResultItem item;
+                    double ratio = plainText.length() > 0 ? (static_cast<double>(matchIdx) / plainText.length()) : 0.0;
+                    int chapterSpan = std::max<int>(1, static_cast<int>(m_zipEntries.value(chapterPath).size() / BYTES_PER_SYNTHETIC_PAGE));
+                    int pageInChapter = std::min(chapterSpan - 1, static_cast<int>(ratio * chapterSpan));
 
-                    int pageInChapter = 0;
-                    auto doc = getChapterDocument(s);
-                    if (doc) {
-                        QTextBlock block = doc->findBlock(static_cast<int>(matchIdx));
-                        if (block.isValid()) {
-                            qreal blockTop = doc->documentLayout()->blockBoundingRect(block).top();
-                            pageInChapter = std::max(0, static_cast<int>(blockTop / PAGE_HEIGHT_POINTS));
-                        }
-                    }
-
-                    item.pageNum = startPage + pageInChapter + 1; // 1-indexed
+                    item.pageNum = startPage + pageInChapter + 1;
 
                     int snippetStart = std::max<int>(0, static_cast<int>(matchIdx) - 35);
                     int snippetEnd = std::min<int>(static_cast<int>(plainText.length()), static_cast<int>(matchIdx + query.length()) + 45);
@@ -312,14 +427,13 @@ void EpubDocument::startSearch(const QString &text, bool matchCase, bool wholeWo
     });
 }
 
-// Helper to determine string length safely
-static inline qsizetype pageTextLength(const QString& str) {
-    return str.length();
-}
-
-// --- In-Memory ZIP Decompression ---
+// --- ZIP Engine ---
 
 QByteArray EpubDocument::decompressDeflate(const char* data, quint32 compressedSize, quint32 uncompressedSize) {
+    if (compressedSize == 0 || uncompressedSize == 0 || !data || uncompressedSize > 100 * 1024 * 1024) {
+        return QByteArray();
+    }
+
     QByteArray output;
     output.resize(uncompressedSize);
 
@@ -347,29 +461,21 @@ QByteArray EpubDocument::decompressDeflate(const char* data, quint32 compressedS
 QString EpubDocument::normalizeZipPath(const QString& rawPath) {
     QString p = rawPath;
     p.replace('\\', '/');
-    while (p.startsWith('/')) {
-        p.remove(0, 1);
-    }
+    while (p.startsWith('/')) p.remove(0, 1);
     return QDir::cleanPath(p);
 }
 
 QString EpubDocument::resolveRelativePath(const QString& basePath, const QString& relativePath) {
-    if (relativePath.startsWith('/')) {
-        return normalizeZipPath(relativePath);
-    }
+    if (relativePath.startsWith('/')) return normalizeZipPath(relativePath);
     return normalizeZipPath(basePath + "/" + relativePath);
 }
 
 bool EpubDocument::readZipArchive(const QString& localPath) {
     QFile file(localPath);
-    if (!file.open(QIODevice::ReadOnly)) {
-        return false;
-    }
+    if (!file.open(QIODevice::ReadOnly)) return false;
 
     const qint64 fileSize = file.size();
-    if (fileSize < 22) {
-        return false;
-    }
+    if (fileSize < 22) return false;
 
     const qint64 maxTailSearch = std::min<qint64>(fileSize, 65557);
     file.seek(fileSize - maxTailSearch);
@@ -386,9 +492,7 @@ bool EpubDocument::readZipArchive(const QString& localPath) {
         }
     }
 
-    if (eocdOffsetInTail == -1) {
-        return false;
-    }
+    if (eocdOffsetInTail == -1) return false;
 
     const char* eocd = tail.constData() + eocdOffsetInTail;
     quint16 totalEntries = 0;
@@ -396,7 +500,8 @@ bool EpubDocument::readZipArchive(const QString& localPath) {
     std::memcpy(&totalEntries, eocd + 10, sizeof(quint16));
     std::memcpy(&cdOffset, eocd + 16, sizeof(quint32));
 
-    file.seek(cdOffset);
+    if (cdOffset >= fileSize) return false;
+    if (!file.seek(cdOffset)) return false;
 
     for (quint16 i = 0; i < totalEntries; ++i) {
         char cdHeader[46];
@@ -425,19 +530,24 @@ bool EpubDocument::readZipArchive(const QString& localPath) {
 
         qint64 nextCdPos = file.pos();
 
-        file.seek(localOffset);
-        ZipLocalHeader locHeader;
-        if (file.read(reinterpret_cast<char*>(&locHeader), sizeof(ZipLocalHeader)) == sizeof(ZipLocalHeader)) {
-            if (locHeader.signature == 0x04034b50) {
-                qint64 dataOffset = localOffset + sizeof(ZipLocalHeader) + locHeader.fileNameLength + locHeader.extraFieldLength;
-                file.seek(dataOffset);
-                QByteArray compressedData = file.read(compSize);
-
-                if (method == 0) {
-                    m_zipEntries.insert(fileName, compressedData);
-                } else if (method == 8) {
-                    QByteArray decompressed = decompressDeflate(compressedData.constData(), compSize, uncompSize);
-                    m_zipEntries.insert(fileName, decompressed);
+        if (localOffset < fileSize && file.seek(localOffset)) {
+            ZipLocalHeader locHeader;
+            if (file.read(reinterpret_cast<char*>(&locHeader), sizeof(ZipLocalHeader)) == sizeof(ZipLocalHeader)) {
+                if (locHeader.signature == 0x04034b50) {
+                    qint64 dataOffset = localOffset + sizeof(ZipLocalHeader) + locHeader.fileNameLength + locHeader.extraFieldLength;
+                    if (dataOffset < fileSize && file.seek(dataOffset)) {
+                        QByteArray compressedData = file.read(compSize);
+                        if (compressedData.size() == static_cast<int>(compSize)) {
+                            if (method == 0) {
+                                m_zipEntries.insert(fileName, compressedData);
+                            } else if (method == 8) {
+                                QByteArray decompressed = decompressDeflate(compressedData.constData(), compSize, uncompSize);
+                                if (!decompressed.isEmpty() || uncompSize == 0) {
+                                    m_zipEntries.insert(fileName, decompressed);
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -448,13 +558,11 @@ bool EpubDocument::readZipArchive(const QString& localPath) {
     return !m_zipEntries.isEmpty();
 }
 
-// --- EPUB XML & Table of Contents Engine ---
+// --- EPUB XML Engine ---
 
 bool EpubDocument::parseContainerXml() {
     const QString containerKey = "META-INF/container.xml";
-    if (!m_zipEntries.contains(containerKey)) {
-        return false;
-    }
+    if (!m_zipEntries.contains(containerKey)) return false;
 
     QXmlStreamReader xml(m_zipEntries[containerKey]);
     QString opfPath;
@@ -463,23 +571,16 @@ bool EpubDocument::parseContainerXml() {
         xml.readNext();
         if (xml.isStartElement() && xml.name() == QLatin1String("rootfile")) {
             opfPath = xml.attributes().value("full-path").toString();
-            if (!opfPath.isEmpty()) {
-                break;
-            }
+            if (!opfPath.isEmpty()) break;
         }
     }
 
-    if (opfPath.isEmpty()) {
-        return false;
-    }
-
+    if (opfPath.isEmpty()) return false;
     return parseOpfFile(normalizeZipPath(opfPath));
 }
 
 bool EpubDocument::parseOpfFile(const QString& opfPath) {
-    if (!m_zipEntries.contains(opfPath)) {
-        return false;
-    }
+    if (!m_zipEntries.contains(opfPath)) return false;
 
     int lastSlash = opfPath.lastIndexOf('/');
     m_opfDirectory = (lastSlash != -1) ? opfPath.left(lastSlash) : "";
@@ -506,9 +607,7 @@ bool EpubDocument::parseOpfFile(const QString& opfPath) {
                     QString fullZipPath = resolveRelativePath(m_opfDirectory, href);
                     m_manifest.insert(id, fullZipPath);
 
-                    if (properties.contains("nav")) {
-                        navHref = fullZipPath;
-                    }
+                    if (properties.contains("nav")) navHref = fullZipPath;
                 }
             } else if (tag == QLatin1String("spine")) {
                 ncxId = xml.attributes().value("toc").toString();
@@ -528,14 +627,11 @@ bool EpubDocument::parseOpfFile(const QString& opfPath) {
         m_title = QFileInfo(m_fileUrl.toLocalFile()).completeBaseName();
     }
 
-    if (m_spine.isEmpty()) {
-        return false;
-    }
+    if (m_spine.isEmpty()) return false;
 
-    // Step 1: Paginate the document FIRST so chapter start pages are mapped
+    // Fast synthetic pagination
     paginateDocument();
 
-    // Step 2: Parse XML directly into m_tableOfContents with accurate page numbers
     m_tableOfContents.clear();
     if (!ncxId.isEmpty() && m_manifest.contains(ncxId)) {
         parseTocNcx(m_manifest[ncxId], m_tableOfContents);
@@ -566,13 +662,13 @@ void EpubDocument::parseNavPoints(QXmlStreamReader& xml, const QString& ncxDir, 
                             node.title = xml.readElementText().trimmed();
                         } else if (xml.name() == QLatin1String("content")) {
                             QString src = xml.attributes().value("src").toString();
+                            node.targetLocation = resolveRelativePath(ncxDir, src);
                             QString pureFile = src.split('#').first();
                             QString target = resolveRelativePath(ncxDir, pureFile);
                             if (m_spineStartPage.contains(target)) {
-                                node.pageNum = m_spineStartPage[target] + 1; // 1-indexed true page
+                                node.pageNum = m_spineStartPage[target] + 1;
                             }
                         } else if (xml.name() == QLatin1String("navPoint")) {
-                            // Recursively populate nested children directly into TocItemChildren
                             xml.readNext();
                             QVector<TocItem> childList;
                             parseNavPoints(xml, ncxDir, childList);
@@ -630,6 +726,7 @@ void EpubDocument::parseNavXhtml(const QString& navPath, QVector<TocItem>& tocLi
 
                 TocItem item;
                 item.title = title;
+                item.targetLocation = resolveRelativePath(navDir, href);
                 item.pageNum = m_spineStartPage.contains(target) ? (m_spineStartPage[target] + 1) : 1;
                 item.hasChildren = false;
                 tocList.append(item);
@@ -644,34 +741,27 @@ void EpubDocument::generateFallbackToc() {
         TocItem item;
         item.title = QString("Chapter %1").arg(i + 1);
         item.pageNum = m_spineStartPage.value(m_spine[i].zipPath, 0) + 1;
+        item.targetLocation = m_spine[i].zipPath;
         item.hasChildren = false;
         m_tableOfContents.append(item);
     }
 }
 
-// --- Pagination & Layout Engine ---
-
+// Chapter layout loader using QMap<int, shared_ptr> (no dangling pointers on eviction)
 std::shared_ptr<QTextDocument> EpubDocument::getChapterDocument(int spineIndex) {
-    if (spineIndex < 0 || spineIndex >= m_spine.size()) {
-        return nullptr;
-    }
+    if (spineIndex < 0 || spineIndex >= m_spine.size()) return nullptr;
 
-    {
-        QMutexLocker locker(&m_layoutMutex);
-        if (m_chapterLayoutCache.contains(spineIndex)) {
-            return std::shared_ptr<QTextDocument>(m_chapterLayoutCache.object(spineIndex), [](QTextDocument*) {});
-        }
+    if (m_chapterLayoutCache.contains(spineIndex)) {
+        return m_chapterLayoutCache.value(spineIndex);
     }
 
     const QString& chapterPath = m_spine[spineIndex].zipPath;
-    if (!m_zipEntries.contains(chapterPath)) {
-        return nullptr;
-    }
+    if (!m_zipEntries.contains(chapterPath)) return nullptr;
 
     int lastSlash = chapterPath.lastIndexOf('/');
     QString chapterDir = (lastSlash != -1) ? chapterPath.left(lastSlash) : "";
 
-    auto doc = std::make_unique<EpubResourceDocument>(m_zipEntries, chapterDir);
+    auto doc = std::make_shared<EpubResourceDocument>(m_zipEntries, chapterDir);
     doc->setPageSize(QSizeF(PAGE_WIDTH_POINTS, PAGE_HEIGHT_POINTS));
 
     doc->setDefaultStyleSheet(
@@ -684,63 +774,30 @@ std::shared_ptr<QTextDocument> EpubDocument::getChapterDocument(int spineIndex) 
     QString htmlContent = QString::fromUtf8(m_zipEntries[chapterPath]);
     doc->setHtml(htmlContent);
 
-    QTextDocument* rawPtr = doc.release();
-    {
-        QMutexLocker locker(&m_layoutMutex);
-        m_chapterLayoutCache.insert(spineIndex, rawPtr, 1);
+    if (m_chapterLayoutCache.size() > 10) {
+        m_chapterLayoutCache.remove(m_chapterLayoutCache.firstKey());
     }
+    m_chapterLayoutCache.insert(spineIndex, doc);
 
-    return std::shared_ptr<QTextDocument>(rawPtr, [](QTextDocument*) {});
+    return doc;
 }
 
-void EpubDocument::paginateDocument() {
-    m_pageMappings.clear();
-    m_spineStartPage.clear();
-    m_chapterPlainTextCache.clear();
-    m_chapterPlainTextCache.resize(m_spine.size());
-
-    int runningGlobalPage = 0;
-
-    for (int s = 0; s < m_spine.size(); ++s) {
-        const QString& path = m_spine[s].zipPath;
-        m_spineStartPage.insert(path, runningGlobalPage);
-
-        auto doc = getChapterDocument(s);
-        int chapterPages = 1;
-
-        if (doc) {
-            m_chapterPlainTextCache[s] = doc->toPlainText();
-            qreal docHeight = doc->size().height();
-            chapterPages = std::max(1, static_cast<int>(std::ceil(docHeight / PAGE_HEIGHT_POINTS)));
-        }
-
-        for (int p = 0; p < chapterPages; ++p) {
-            EpubPageMapping mapping;
-            mapping.spineIndex = s;
-            mapping.pageInChapter = p;
-            mapping.globalPageIndex = runningGlobalPage;
-            m_pageMappings.append(mapping);
-            runningGlobalPage++;
-        }
-    }
-
-    m_totalPageNumber = m_pageMappings.size();
-}
-
-QList<TextRectItem> EpubDocument::extractWordRectsForPage(QTextDocument* doc, int pageInChapter) {
+QList<TextRectItem> EpubDocument::extractWordRectsForPage(QTextDocument* doc, int pageInChapter, int totalPagesInChapter) {
     QList<TextRectItem> result;
     if (!doc) return result;
 
-    const qreal pageYStart = pageInChapter * PAGE_HEIGHT_POINTS;
-    const qreal pageYEnd = (pageInChapter + 1) * PAGE_HEIGHT_POINTS;
+    qreal docHeight = std::max(PAGE_HEIGHT_POINTS, doc->size().height());
+    int totalPages = std::max(1, totalPagesInChapter);
+    qreal sliceHeight = docHeight / totalPages;
+    const qreal pageYStart = pageInChapter * sliceHeight;
+    const qreal pageYEnd = (pageInChapter + 1) * sliceHeight;
 
     QAbstractTextDocumentLayout *layout = doc->documentLayout();
+    if (!layout) return result;
 
     for (QTextBlock block = doc->begin(); block.isValid(); block = block.next()) {
         QRectF blockRect = layout->blockBoundingRect(block);
-        if (blockRect.bottom() < pageYStart || blockRect.top() > pageYEnd) {
-            continue;
-        }
+        if (blockRect.bottom() < pageYStart || blockRect.top() > pageYEnd) continue;
 
         QTextLayout *tl = block.layout();
         if (!tl) continue;
@@ -754,9 +811,7 @@ QList<TextRectItem> EpubDocument::extractWordRectsForPage(QTextDocument* doc, in
         for (int i = 0; i <= len; ++i) {
             bool isWordChar = (i < len) && !text.at(i).isSpace();
             if (isWordChar) {
-                if (wordStart == -1) {
-                    wordStart = i;
-                }
+                if (wordStart == -1) wordStart = i;
             } else {
                 if (wordStart != -1) {
                     int wordLen = i - wordStart;

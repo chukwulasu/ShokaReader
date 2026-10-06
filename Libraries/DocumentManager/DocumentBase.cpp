@@ -41,6 +41,17 @@ void DocumentBase::startSearch(const QString &text, bool matchCase, bool wholeWo
 void DocumentBase::cancelSearch() {
 }
 
+int DocumentBase::resolvePage(int pageNum, const QString &targetLocation) const {
+    Q_UNUSED(targetLocation);
+    return pageNum > 0 ? pageNum : 1;
+}
+
+int DocumentBase::resolvePage(const QVariantMap &item) const {
+    int page = item.value("pageNum").toInt();
+    QString target = item.value("targetLocation").toString();
+    return resolvePage(page, target);
+}
+
 const QVector<TocItem>& DocumentBase::getTableOfContents() {
     return m_tableOfContents;
 }
@@ -58,14 +69,14 @@ QString DocumentBase::getTitle() const {
 }
 
 int DocumentBase::rowCount(const QModelIndex &parent) const {
-    if (parent.isValid() == true) {
+    if (parent.isValid()) {
         return 0;
     }
     return m_totalPageNumber;
 }
 
 QVariant DocumentBase::data(const QModelIndex &index, int role) const {
-    if (index.isValid() == false || index.row() < 0 || index.row() >= m_totalPageNumber) {
+    if (!index.isValid() || index.row() < 0 || index.row() >= m_totalPageNumber) {
         return QVariant();
     }
 

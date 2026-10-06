@@ -9,6 +9,7 @@
 #include <QAbstractListModel>
 #include <QVector>
 #include <QList>
+#include <QVariantMap>
 #include <QMetaType>
 
 enum class DocumentState {
@@ -24,17 +25,21 @@ struct TocItem {
     Q_PROPERTY(int pageNum MEMBER pageNum CONSTANT)
     Q_PROPERTY(bool hasChildren MEMBER hasChildren CONSTANT)
     Q_PROPERTY(QVector<TocItem> TocItemChildren MEMBER TocItemChildren CONSTANT)
+    Q_PROPERTY(QString targetLocation MEMBER targetLocation CONSTANT)
 
 public:
     QString title;
     int pageNum = -1;
     bool hasChildren = false;
     QVector<TocItem> TocItemChildren;
+    QString targetLocation;
+
     bool operator==(const TocItem& other) const {
         return title == other.title &&
                pageNum == other.pageNum &&
                hasChildren == other.hasChildren &&
-               TocItemChildren == other.TocItemChildren;
+               TocItemChildren == other.TocItemChildren &&
+               targetLocation == other.targetLocation;
     }
 };
 
@@ -114,6 +119,10 @@ public:
     // Asynchronous Background Search API
     Q_INVOKABLE virtual void startSearch(const QString &text, bool matchCase = false, bool wholeWord = false);
     Q_INVOKABLE virtual void cancelSearch();
+
+    // Polymorphic Navigation (supports both JS Object map and direct ints/strings)
+    Q_INVOKABLE virtual int resolvePage(int pageNum, const QString &targetLocation = QString()) const;
+    Q_INVOKABLE virtual int resolvePage(const QVariantMap &item) const;
 
     QUrl getFileUrl() const;
     int getTotalPageNumber() const;
