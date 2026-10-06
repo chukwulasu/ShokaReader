@@ -107,7 +107,7 @@ QImage PdfDocument::getPageImageData(int pageIndex) {
         return QImage();
     }
 
-    constexpr double renderDpi = 180.0;
+    constexpr double renderDpi = 180.0;  //180 DPI gave the best result so don't change it
     return pdfPage->renderToImage(renderDpi, renderDpi);
 }
 

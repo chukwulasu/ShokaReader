@@ -1,5 +1,6 @@
 #include "Libraries/DocumentManager/DocumentManager.h"
 #include "Libraries/DocumentManager/PdfDocument.h"
+#include "Libraries/DocumentManager/EpubDocument.h"
 
 DocumentManager::DocumentManager(QObject* parent)
     : QObject(parent) {
@@ -41,9 +42,9 @@ void DocumentManager::openDocument(const QUrl& filePath) {
         m_pendingDocument = std::make_unique<PdfDocument>();
     }
 
-    /* else if (type == DocumentType::EPUB) {
-        m_activeDocument = std::make_unique<EpubDocument>();
-    } */
+    else if (fileType == DocumentType::EPUB) {
+        m_pendingDocument = std::make_unique<EpubDocument>();
+    }
 
     DocumentState state = m_pendingDocument->getDocumentMetaData(filePath);
     if (state == DocumentState::LoadSuccessful) {

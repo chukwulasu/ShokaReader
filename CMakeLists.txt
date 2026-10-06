@@ -12,6 +12,7 @@ endif()
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(PopplerQt6 REQUIRED IMPORTED_TARGET poppler-qt6)
 find_package(Qt6 REQUIRED COMPONENTS Quick)
+find_package(ZLIB REQUIRED)
 
 qt_standard_project_setup(REQUIRES 6.10)
 
@@ -32,6 +33,8 @@ qt_add_executable(ShokaReader
     ./Libraries/DocumentManager/DocumentPageImageProvider.cpp
     ./Libraries/LibraryManager/LibraryManager.h
     ./Libraries/LibraryManager/LibraryManager.cpp
+    ./Libraries/DocumentManager/EpubDocument.h
+    ./Libraries/DocumentManager/EpubDocument.cpp
     ${RESOURCE_FILES}
     )
 
@@ -84,6 +87,7 @@ set_target_properties(ShokaReader PROPERTIES
 target_link_libraries(ShokaReader PRIVATE
     Qt6::Quick
     PkgConfig::PopplerQt6
+    ZLIB::ZLIB
 )
 
 install(TARGETS ShokaReader
