@@ -12,12 +12,17 @@ Rectangle {
     border.width: 1
 
     property var searchResults: []
+    property bool isSearching: false
     property bool matchCase: false
     property bool matchWholeWord: false
 
     function triggerSearch() {
         if (!documentManager.activeDocument || searchField.text.trim().length === 0) {
             searchResults = [];
+            isSearching = false;
+            if (documentManager.activeDocument) {
+                documentManager.activeDocument.cancelSearch();
+            }
             if (searchSidebar.reader) {
                 searchSidebar.reader.searchPhrase = "";
             }
@@ -31,7 +36,19 @@ Rectangle {
             searchSidebar.reader.searchMatchWholeWord = matchWholeWord;
         }
 
-        searchResults = documentManager.activeDocument.searchDocument(query, matchCase, matchWholeWord);
+        isSearching = true;
+        documentManager.activeDocument.startSearch(query, matchCase, matchWholeWord);
+    }
+
+    Connections {
+        target: documentManager.activeDocument
+        ignoreUnknownSignals: true
+        function onSearchResultsReady(query, results) {
+            if (query === searchField.text.trim()) {
+                searchSidebar.searchResults = results;
+                searchSidebar.isSearching = false;
+            }
+        }
     }
 
     Timer {
@@ -49,9 +66,13 @@ Rectangle {
                 searchDebounceTimer.restart();
             }
         } else {
+            if (documentManager.activeDocument) {
+                documentManager.activeDocument.cancelSearch();
+            }
             if (searchSidebar.reader) {
                 searchSidebar.reader.searchPhrase = "";
             }
+            isSearching = false;
         }
     }
 
@@ -101,7 +122,7 @@ Rectangle {
             }
         }
 
-        // Search Input Box with embedded Aa and ab controls
+        // Search Input Box
         Rectangle {
             id: searchInputBox
             anchors.top: headerRow.bottom
@@ -147,7 +168,6 @@ Rectangle {
                     }
                 }
 
-                // Clear button
                 Text {
                     text: "✕"
                     font.pixelSize: 11
@@ -161,6 +181,10 @@ Rectangle {
                         onClicked: {
                             searchField.text = "";
                             searchSidebar.searchResults = [];
+                            searchSidebar.isSearching = false;
+                            if (documentManager.activeDocument) {
+                                documentManager.activeDocument.cancelSearch();
+                            }
                             if (searchSidebar.reader) {
                                 searchSidebar.reader.searchPhrase = "";
                             }
@@ -250,17 +274,19 @@ Rectangle {
             }
         }
 
-        // Count Label: e.g. "Search results (941)"
+        // Search Status Label
         Text {
             id: countLabel
             anchors.top: searchInputBox.bottom
             anchors.topMargin: 14
             anchors.left: parent.left
             anchors.right: parent.right
-            text: "Search results (" + searchSidebar.searchResults.length + ")"
+            text: searchSidebar.isSearching
+                  ? "Searching..."
+                  : ("Search results (" + searchSidebar.searchResults.length + ")")
             font.bold: true
             font.pixelSize: 13
-            color: "#212529"
+            color: searchSidebar.isSearching ? "#0d6efd" : "#212529"
             visible: searchField.text.trim().length > 0
         }
 
@@ -275,32 +301,29 @@ Rectangle {
             text: "No matches found"
             font.pixelSize: 13
             color: "#6c757d"
-            visible: searchField.text.trim().length > 0 && searchSidebar.searchResults.length === 0
+            visible: searchField.text.trim().length > 0 &&
+                     !searchSidebar.isSearching &&
+                     searchSidebar.searchResults.length === 0
         }
 
-        // Results List
-        Flickable {
-            id: resultsFlickable
+        // Virtualized Results ListView (scales to thousands of matches without lag)
+        ListView {
+            id: resultsListView
             anchors.top: countLabel.bottom
             anchors.topMargin: 8
             anchors.bottom: parent.bottom
             anchors.left: parent.left
             anchors.right: parent.right
-            contentWidth: width
-            contentHeight: resultsColumn.height
             clip: true
+            spacing: 3
             visible: searchSidebar.searchResults.length > 0
+            model: searchSidebar.searchResults
 
             ScrollBar.vertical: ScrollBar {
                 id: vbar
-                parent: resultsFlickable.parent
-                x: resultsFlickable.x + resultsFlickable.width - width - 2
-                y: resultsFlickable.y
-                height: resultsFlickable.height
                 active: true
                 policy: ScrollBar.AlwaysOn
                 width: 6
-                z: 1000
 
                 background: Rectangle {
                     radius: 3
@@ -314,95 +337,85 @@ Rectangle {
                 }
             }
 
-            Column {
-                id: resultsColumn
-                width: parent.width - vbar.width - 8
-                spacing: 3
+            delegate: Rectangle {
+                width: resultsListView.width - 8
+                height: Math.max(34, contentRow.implicitHeight + 8)
+                color: itemHover.containsMouse ? "#eceff1" : "transparent"
+                radius: 4
 
-                Repeater {
-                    model: searchSidebar.searchResults
+                MouseArea {
+                    id: itemHover
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: {
+                        if (searchField.activeFocus && searchSidebar.reader) {
+                            searchSidebar.reader.forceActiveFocus();
+                        }
+                        if (searchSidebar.reader) {
+                            searchSidebar.reader.jumpToPage(modelData.pageNum);
+                        }
+                    }
+                }
 
-                    delegate: Rectangle {
-                        width: resultsColumn.width
-                        height: Math.max(34, contentRow.implicitHeight + 8)
-                        color: itemHover.containsMouse ? "#eceff1" : "transparent"
-                        radius: 4
+                RowLayout {
+                    id: contentRow
+                    anchors.fill: parent
+                    anchors.leftMargin: 8
+                    anchors.rightMargin: 8
+                    spacing: 6
 
-                        MouseArea {
-                            id: itemHover
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: {
-                                if (searchField.activeFocus && searchSidebar.reader) {
-                                    searchSidebar.reader.forceActiveFocus();
-                                }
-                                if (searchSidebar.reader) {
-                                    searchSidebar.reader.jumpToPage(modelData.pageNum);
-                                }
-                            }
+                    // Snippet: beforeText + [highlighted pill] + afterText
+                    Row {
+                        Layout.fillWidth: true
+                        Layout.alignment: Qt.AlignVCenter
+                        spacing: 4
+                        clip: true
+
+                        Text {
+                            text: modelData.textBefore
+                            font.pixelSize: 12
+                            color: "#495057"
+                            elide: Text.ElideLeft
+                            maximumLineCount: 1
+                            anchors.verticalCenter: parent.verticalCenter
                         }
 
-                        RowLayout {
-                            id: contentRow
-                            anchors.fill: parent
-                            anchors.leftMargin: 8
-                            anchors.rightMargin: 8
-                            spacing: 6
+                        Rectangle {
+                            height: matchTextLabel.implicitHeight + 2
+                            width: matchTextLabel.implicitWidth + 6
+                            radius: 2
+                            color: "#fff3cd"
+                            border.color: "#ffeeba"
+                            border.width: 1
+                            anchors.verticalCenter: parent.verticalCenter
 
-                            // Snippet: beforeText + [highlighted pill] + afterText
-                            Row {
-                                Layout.fillWidth: true
-                                Layout.alignment: Qt.AlignVCenter
-                                spacing: 4
-                                clip: true
-
-                                Text {
-                                    text: modelData.textBefore
-                                    font.pixelSize: 12
-                                    color: "#495057"
-                                    elide: Text.ElideLeft
-                                    maximumLineCount: 1
-                                    anchors.verticalCenter: parent.verticalCenter
-                                }
-
-                                Rectangle {
-                                    height: matchTextLabel.implicitHeight + 2
-                                    width: matchTextLabel.implicitWidth + 6
-                                    radius: 2
-                                    color: "#fff3cd"
-                                    border.color: "#ffeeba"
-                                    border.width: 1
-                                    anchors.verticalCenter: parent.verticalCenter
-
-                                    Text {
-                                        id: matchTextLabel
-                                        anchors.centerIn: parent
-                                        text: modelData.matchText
-                                        font.pixelSize: 12
-                                        font.bold: true
-                                        color: "#856404"
-                                    }
-                                }
-
-                                Text {
-                                    text: modelData.textAfter
-                                    font.pixelSize: 12
-                                    color: "#495057"
-                                    elide: Text.ElideRight
-                                    maximumLineCount: 1
-                                    anchors.verticalCenter: parent.verticalCenter
-                                }
-                            }
-
-                            // Page Number
                             Text {
-                                text: modelData.pageNum.toString()
-                                font.pixelSize: 11
-                                color: "#868e96"
-                                Layout.alignment: Qt.AlignVCenter
+                                id: matchTextLabel
+                                anchors.centerIn: parent
+                                text: modelData.matchText
+                                font.pixelSize: 12
+                                font.bold: true
+                                color: "#856404"
                             }
                         }
+
+                        Text {
+                            text: modelData.textAfter
+                            font.pixelSize: 12
+                            color: "#495057"
+                            elide: Text.ElideRight
+                            maximumLineCount: 1
+                            anchors.verticalCenter: parent.verticalCenter
+                        }
+                    }
+
+                    // Page Number
+                    Text {
+                        text: modelData.pageNum.toString()
+                        font.pixelSize: 11
+                        color: "#868e96"
+                        Layout.alignment: Qt.AlignVCenter
                     }
                 }
             }

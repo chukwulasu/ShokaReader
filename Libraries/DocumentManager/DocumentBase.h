@@ -91,7 +91,7 @@ public:
 
 Q_DECLARE_METATYPE(SearchResultItem)
 
-class DocumentBase : public QAbstractListModel{
+class DocumentBase : public QAbstractListModel {
     Q_OBJECT
     Q_PROPERTY(QUrl fileUrl READ getFileUrl CONSTANT)
     Q_PROPERTY(int totalPageNumber READ getTotalPageNumber CONSTANT)
@@ -111,12 +111,19 @@ public:
     Q_INVOKABLE virtual QList<QRectF> searchPage(int pageIndex, const QString &text, bool matchCase = false, bool wholeWord = false);
     Q_INVOKABLE virtual QList<SearchResultItem> searchDocument(const QString &text, bool matchCase = false, bool wholeWord = false);
 
+    // Asynchronous Background Search API
+    Q_INVOKABLE virtual void startSearch(const QString &text, bool matchCase = false, bool wholeWord = false);
+    Q_INVOKABLE virtual void cancelSearch();
+
     QUrl getFileUrl() const;
     int getTotalPageNumber() const;
     QString getTitle() const;
     bool canCopy() const;
     int rowCount(const QModelIndex &parent = QModelIndex()) const override;
     QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const override;
+
+signals:
+    void searchResultsReady(const QString &query, const QList<SearchResultItem> &results);
 
 protected:
     QUrl m_fileUrl;

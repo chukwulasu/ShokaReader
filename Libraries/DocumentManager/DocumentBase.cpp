@@ -1,8 +1,7 @@
 #include "Libraries/DocumentManager/DocumentBase.h"
 
 DocumentBase::DocumentBase(QObject* parent)
-    : QAbstractListModel(parent){
-
+    : QAbstractListModel(parent) {
 }
 
 DocumentBase::~DocumentBase() = default;
@@ -32,19 +31,29 @@ QList<SearchResultItem> DocumentBase::searchDocument(const QString &text, bool m
     return {};
 }
 
-const QVector<TocItem>& DocumentBase::getTableOfContents(){
+void DocumentBase::startSearch(const QString &text, bool matchCase, bool wholeWord) {
+    Q_UNUSED(text);
+    Q_UNUSED(matchCase);
+    Q_UNUSED(wholeWord);
+    emit searchResultsReady(text, {});
+}
+
+void DocumentBase::cancelSearch() {
+}
+
+const QVector<TocItem>& DocumentBase::getTableOfContents() {
     return m_tableOfContents;
 }
 
-QUrl DocumentBase::getFileUrl() const{
+QUrl DocumentBase::getFileUrl() const {
     return m_fileUrl;
 }
 
-int DocumentBase::getTotalPageNumber() const{
+int DocumentBase::getTotalPageNumber() const {
     return m_totalPageNumber;
 }
 
-QString DocumentBase::getTitle() const{
+QString DocumentBase::getTitle() const {
     return m_title;
 }
 
